@@ -1,0 +1,15 @@
+# Normalize line endings across OS
+* text=auto
+
+# Python files always LF
+*.py text eol=lf
+
+# Markdown & text files
+*.md text eol=lf
+*.txt text eol=lf
+
+# JSON files
+*.json text eol=lf
+
+# Env files
+.env.example text eol=lf

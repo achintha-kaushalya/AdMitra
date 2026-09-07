@@ -1,0 +1,30 @@
+# .gitignore for AdMitra
+# ========================
+
+# --- Secrets ---
+.env
+*.key
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+.venv/
+venv/
+env/
+
+# --- ChromaDB local vector store ---
+ir/chroma_db/
+
+# --- Streamlit cache ---
+.streamlit/
+
+# --- IDE ---
+.vscode/
+.idea/
+*.swp
+
+# --- OS ---
+.DS_Store
+Thumbs.db
