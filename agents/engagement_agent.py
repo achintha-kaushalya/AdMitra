@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import os
+import warnings
 from datetime import datetime, timezone
 from typing import Any
+
+warnings.filterwarnings("ignore", category=FutureWarning)
 
 try:
     import google.generativeai as genai
