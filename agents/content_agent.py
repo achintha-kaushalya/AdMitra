@@ -8,6 +8,9 @@ import re
 from datetime import datetime, timezone
 from typing import Any
 
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning)
+
 try:
     import google.generativeai as genai
 except ImportError:  # pragma: no cover - exercised when optional dependencies are absent
@@ -104,6 +107,13 @@ Adapt the Sinhala copy naturally for Sri Lankan customers; do not transliterate 
 """
     response = model.generate_content(prompt)
     creative = _extract_json(response.text)
+    
+    # Enforce character limits safety
+    for lang in ["english", "sinhala"]:
+        if lang in creative and isinstance(creative[lang], dict):
+            creative[lang]["headline"] = str(creative[lang].get("headline", ""))[:40]
+            creative[lang]["body"] = str(creative[lang].get("body", ""))[:125]
+
     creative["tone"] = tone
     creative["source"] = model_name
     return creative
