@@ -11,7 +11,18 @@ AGENT_NAME = "DiagnosticAgent"
 ACCOUNT_DATA_PATH = Path(__file__).resolve().parents[1] / "mock_data" / "meta_ads_account.json"
 
 
+try:
+    from shared.meta_api import fetch_live_ad_account
+except ImportError:
+    fetch_live_ad_account = None
+
+
 def _load_account() -> dict[str, Any]:
+    if fetch_live_ad_account:
+        live_data = fetch_live_ad_account()
+        if live_data:
+            return live_data
+
     with ACCOUNT_DATA_PATH.open(encoding="utf-8") as account_file:
         data = json.load(account_file)
     if not isinstance(data, dict):

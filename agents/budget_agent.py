@@ -74,24 +74,16 @@ def _fallback_campaign_metrics() -> List[Dict[str, Any]]:
 
 def _load_campaign_metrics() -> List[Dict[str, Any]]:
     """
-    Load current campaign metrics from Member 2's file.
-
-    Supported formats:
-
-    [
-        {...},
-        {...}
-    ]
-
-    or:
-
-    {
-        "campaigns": [
-            {...},
-            {...}
-        ]
-    }
+    Load current campaign metrics from live Meta API or Member 2's file.
     """
+    try:
+        from shared.meta_api import fetch_live_campaign_metrics
+        live_metrics = fetch_live_campaign_metrics()
+        if live_metrics:
+            return live_metrics
+    except Exception:
+        pass
+
     base_dir = Path(__file__).resolve().parents[1]
     metrics_path = (
         base_dir

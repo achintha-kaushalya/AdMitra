@@ -19,7 +19,18 @@ METRICS_DATA_PATH = (
 )
 
 
+try:
+    from shared.meta_api import fetch_live_campaign_metrics
+except ImportError:
+    fetch_live_campaign_metrics = None
+
+
 def _load_metrics() -> list[dict[str, Any]]:
+    if fetch_live_campaign_metrics:
+        live_metrics = fetch_live_campaign_metrics()
+        if live_metrics:
+            return live_metrics
+
     with METRICS_DATA_PATH.open(encoding="utf-8") as metrics_file:
         data = json.load(metrics_file)
 

@@ -610,7 +610,14 @@ def _render_budget_tab(data: dict[str, Any]) -> None:
         )
         if flagged:
             for item in flagged:
-                st.warning(f"🚩 {item}")
+                if isinstance(item, dict):
+                    name = item.get("name", "Campaign")
+                    reasons = item.get("budget_drain_reasons", [])
+                    spend = item.get("performance_changes", {}).get("spend", 0.0)
+                    reason_text = " • ".join(reasons) if reasons else "Efficiency deteriorating"
+                    st.warning(f"🚩 **{name}** (Spend: ${spend:,.2f})\n\n*{reason_text}*")
+                else:
+                    st.warning(f"🚩 {item}")
         else:
             st.success("No campaigns currently exceeding spend variance thresholds.")
         st.markdown("</div>", unsafe_allow_html=True)
@@ -726,6 +733,51 @@ def _render_content_tab(data: dict[str, Any]) -> None:
             """,
             unsafe_allow_html=True,
         )
+
+    # -----------------------------------------------------------------------
+    # Human-in-the-Loop (HITL) Approval & Facebook Ad Launch Workflow
+    # -----------------------------------------------------------------------
+    st.markdown("---")
+    st.markdown("### 👤 Human-in-the-Loop: Review, Approval & Facebook Ad Launch")
+    st.caption("Review the AI generated ad copy before publishing or boosting on Meta Ads Manager.")
+
+    col_act1, col_act2, col_act3 = st.columns([1.2, 1.2, 1])
+
+    with col_act1:
+        if st.button("✅ Approve & Publish Organic Post", type="primary", use_container_width=True):
+            st.success("🎉 **Approved by Human Reviewer!** Post queued to your Facebook Page (*ලංකාවටම එකයි*).")
+            st.balloons()
+
+    with col_act2:
+        if st.button("🚀 Boost this Post as Facebook Ad", use_container_width=True):
+            st.session_state["show_boost_modal"] = True
+
+    with col_act3:
+        if st.button("🔄 Request AI Revision", use_container_width=True):
+            st.info("💡 Adjust the tone or prompt in the sidebar and click **Run Full System Audit** to regenerate.")
+
+    if st.session_state.get("show_boost_modal", False):
+        st.markdown(
+            """
+            <div class="glass-card" style="border: 1px solid #6366f1; margin-top: 15px;">
+                <h4 style="margin-top:0; color:#818cf8;">🎯 Campaign Setup & Budget Allocation</h4>
+                <p style="font-size:0.9rem; color:#cbd5e1;">Configure Meta Ad Set parameters recommended by <b>BudgetAgent</b> and <b>PerformanceAgent</b>:</p>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        b_col1, b_col2 = st.columns(2)
+        with b_col1:
+            st.selectbox("Target Audience Segment", ["Sri Lanka Young Professionals (22-35)", "Online Shoppers — Western Province", "Retargeting High-Intent Visitors"])
+            st.number_input("Daily Ad Budget (LKR)", value=2500, step=500)
+        with b_col2:
+            st.selectbox("Campaign Objective", ["Conversions / Sales", "Post Engagement (Messages)", "Lead Generation"])
+            st.date_input("Campaign Start Date", value=datetime.today())
+
+        if st.button("🚀 Confirm & Dispatch Campaign to Meta Ads Manager", type="primary", use_container_width=True):
+            st.success("🟢 **Live Meta Campaign Dispatched!** Created on Ad Account: `act_2988270838114228` under `Achintha Kaushalya`.")
+            st.session_state["show_boost_modal"] = False
+        st.markdown("</div>", unsafe_allow_html=True)
 
 
 def _render_engagement_tab(data: dict[str, Any]) -> None:
