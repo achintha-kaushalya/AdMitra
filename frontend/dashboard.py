@@ -538,7 +538,7 @@ def _render_diagnostic_tab(data: dict[str, Any]) -> None:
                         <span class="{badge_class}">{severity.upper()} SEVERITY</span>
                     </div>
                     <p style="color: #94a3b8; font-size: 0.9rem; margin-top: 8px; margin-bottom: 0;">
-                        {issue.get('details', 'Issue flagged during routine diagnostic check.')}
+                        {issue.get('details') or issue.get('message') or (issue.get('ad_set_name', '') + ' is currently paused.')}
                     </p>
                 </div>
                 """,
@@ -553,36 +553,37 @@ def _render_diagnostic_tab(data: dict[str, Any]) -> None:
 
 def _render_performance_tab(data: dict[str, Any]) -> None:
     result = _agent_result(data, "performance")
-    summary = result.get("summary", "Performance analysis complete.")
-    metrics = result.get("metrics", {})
-    recommendations = result.get("recommendations", [])
+    summary = result.get("explanation") or result.get("summary", "Performance analysis complete.")
+    metrics = result.get("metrics", [])
+    similar = result.get("similar_campaigns", [])
 
     st.subheader("📈 Campaign Performance & Trend Analytics")
-    st.info(f"**AI Analyst Summary:** {summary}")
+    st.info(f"**AI Analyst Summary:**\n\n{summary}")
 
-    if metrics:
-        st.markdown("#### Key Metric Movement")
-        m_cols = st.columns(len(metrics))
-        for col, (label, val) in zip(m_cols, metrics.items()):
-            col.metric(label, str(val))
+    if isinstance(metrics, list) and metrics:
+        st.markdown("#### Key Live Campaign Metric Movements")
+        for m in metrics[:4]:
+            col1, col2, col3, col4 = st.columns(4)
+            c_name = m.get("name", "Campaign")
+            cpm = m.get("current_CPM", 0)
+            ctr = m.get("current_CTR", 0)
+            roas = m.get("current_ROAS", 0)
+            cpm_delta = m.get("CPM_delta_percent") or 0.0
+            ctr_delta = m.get("CTR_delta_percent") or 0.0
+            roas_delta = m.get("ROAS_delta_percent") or 0.0
 
-        # Render Chart
-        st.markdown("#### Metric Movement Chart")
-        chart_data = []
-        for k, v in metrics.items():
-            try:
-                # Extract numerical value from string e.g. "$14.20 (+12.4%)" -> 12.4
-                if "(" in str(v) and "%" in str(v):
-                    raw_pct = str(v).split("(")[1].replace("%)", "").replace("+", "").replace("%", "").strip()
-                    val_num = float(raw_pct)
-                else:
-                    val_num = float(str(v).replace("%", "").replace("$", "").replace("x", ""))
-                chart_data.append({"Metric": k, "Change (%)": val_num})
-            except Exception:
-                pass
+            st.markdown(f"**📌 {c_name}**")
+            col1.metric("Current CPM", f"${cpm:.2f}", f"{cpm_delta:+.1f}%")
+            col2.metric("Current CTR", f"{ctr:.2f}%", f"{ctr_delta:+.1f}%")
+            col3.metric("Current ROAS", f"{roas:.2f}x", f"{roas_delta:+.1f}%")
+            col4.metric("Total Spend", f"${m.get('spend', 0):,.2f}")
+            st.divider()
 
-        if chart_data:
-            st.bar_chart(chart_data, x="Metric", y="Change (%)", color="#818cf8", height=240)
+    if similar:
+        st.markdown("#### 🔍 ChromaDB Vector Retrieval Evidence (RAG)")
+        for item in similar:
+            meta = item.get("metadata", {})
+            st.caption(f"• **{meta.get('campaign_name', 'Historical Precedent')}** — Lesson: *{meta.get('lesson', 'N/A')}* (ROAS: {meta.get('ROAS')}x)")
 
     if recommendations:
         st.markdown("#### 🎯 Optimization Directives")

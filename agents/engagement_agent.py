@@ -106,16 +106,19 @@ def _brand_reply(comment: str, sentiment: dict[str, Any], entities: list[dict[st
     if genai is None or not api_key:
         return _fallback_reply(comment, sentiment), "local_fallback"
 
-    genai.configure(api_key=api_key)
-    model_name = os.getenv("LLM_MODEL", "gemini-3.6-flash")
-    model = genai.GenerativeModel(model_name)
-    prompt = (
-        "Write one concise, empathetic brand reply to this customer comment. "
-        "Match the sentiment, acknowledge the customer, and avoid inventing facts. "
-        "Return plain text only, under 280 characters.\n"
-        f"Comment: {comment}\nSentiment: {sentiment['label']}\nEntities: {entities}"
-    )
-    return model.generate_content(prompt).text.strip(), model_name
+    try:
+        genai.configure(api_key=api_key)
+        model_name = os.getenv("LLM_MODEL", "gemini-3.5-flash")
+        model = genai.GenerativeModel(model_name)
+        prompt = (
+            "Write one concise, empathetic brand reply to this customer comment. "
+            "Match the sentiment, acknowledge the customer, and avoid inventing facts. "
+            "Return plain text only, under 280 characters.\n"
+            f"Comment: {comment}\nSentiment: {sentiment['label']}\nEntities: {entities}"
+        )
+        return model.generate_content(prompt).text.strip(), model_name
+    except Exception:
+        return _fallback_reply(comment, sentiment), "local_fallback"
 
 
 def run(input: dict) -> dict:

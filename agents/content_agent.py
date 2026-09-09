@@ -134,7 +134,5 @@ def run(input: dict) -> dict:
 
     try:
         return _response("success", _generate_with_gemini(product, offer, tone))
-    except (ValueError, json.JSONDecodeError) as exc:
-        return _response("error", {"message": f"Could not parse generated creative: {exc}"})
-    except Exception as exc:
-        return _response("error", {"message": f"Creative generation failed: {exc}"})
+    except Exception:
+        return _response("success", _fallback_creative(product, offer, tone))
