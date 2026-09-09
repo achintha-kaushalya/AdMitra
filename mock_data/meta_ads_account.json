@@ -1,0 +1,55 @@
+{
+  "account_id": "act_9876543210",
+  "account_name": "AdMitra Demo Account",
+  "currency": "LKR",
+  "billing_status": "PAYMENT_METHOD_REQUIRES_UPDATE",
+  "ad_sets": [
+    {
+      "id": "adset_1001",
+      "name": "Colombo Young Professionals",
+      "status": "PAUSED",
+      "daily_budget": 2500,
+      "ads": [
+        {
+          "id": "ad_1001",
+          "name": "Career Boost Video",
+          "status": "PAUSED",
+          "review_status": "APPROVED",
+          "issues": []
+        }
+      ]
+    },
+    {
+      "id": "adset_1002",
+      "name": "Western Province Online Shoppers",
+      "status": "ACTIVE",
+      "daily_budget": 4000,
+      "ads": [
+        {
+          "id": "ad_1002",
+          "name": "Limited Time Offer",
+          "status": "ACTIVE",
+          "review_status": "DISAPPROVED",
+          "issues": [
+            "Misleading claims in ad copy"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "adset_1003",
+      "name": "Sri Lanka Retargeting Audience",
+      "status": "ACTIVE",
+      "daily_budget": 3000,
+      "ads": [
+        {
+          "id": "ad_1003",
+          "name": "Customer Testimonial Carousel",
+          "status": "ACTIVE",
+          "review_status": "APPROVED",
+          "issues": []
+        }
+      ]
+    }
+  ]
+}
