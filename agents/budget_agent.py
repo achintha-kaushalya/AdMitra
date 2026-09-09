@@ -626,8 +626,8 @@ def _call_llm(
         )
 
         model_name = os.getenv(
-            "GEMINI_MODEL",
-            "gemini-1.5-flash",
+            "LLM_MODEL",
+            os.getenv("GEMINI_MODEL", "gemini-3.5-flash"),
         )
 
         model = genai.GenerativeModel(
