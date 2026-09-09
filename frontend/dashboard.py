@@ -556,6 +556,7 @@ def _render_performance_tab(data: dict[str, Any]) -> None:
     summary = result.get("explanation") or result.get("summary", "Performance analysis complete.")
     metrics = result.get("metrics", [])
     similar = result.get("similar_campaigns", [])
+    recommendations = result.get("recommendations", [])
 
     st.subheader("📈 Campaign Performance & Trend Analytics")
     st.info(f"**AI Analyst Summary:**\n\n{summary}")
