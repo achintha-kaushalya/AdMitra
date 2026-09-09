@@ -16,7 +16,7 @@ try:
     from shared.security import sanitize_input
 except Exception:
     def sanitize_input(text: str) -> str:
-        """Fallback sanitizer used only if shared.security is unavailable."""
+        """Fallback sanitizer if shared security is unavailable."""
         return text
 
 
@@ -24,156 +24,294 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-# Prototype decision thresholds.
-# These are project heuristics, not universal marketing rules.
-HIGH_SPEND_THRESHOLD = 500.0
+# Prototype performance-change thresholds.
+# These are explainable project heuristics rather than
+# universal advertising rules.
 LOW_ROAS_THRESHOLD = 1.0
-HIGH_CPM_THRESHOLD = 25.0
-LOW_CTR_THRESHOLD = 0.5
-
-
-def _fallback_campaign_metrics() -> List[Dict[str, Any]]:
-    """
-    Temporary campaign data used until Member 2's
-    mock_data/campaign_metrics.json becomes available.
-    """
-    return [
-        {
-            "id": "m_001",
-            "campaign_name": "Sample A",
-            "spend": 600.0,
-            "ROAS": 0.8,
-            "CPM": 20.0,
-            "CTR": 0.4,
-        },
-        {
-            "id": "m_002",
-            "campaign_name": "Sample B",
-            "spend": 200.0,
-            "ROAS": 3.0,
-            "CPM": 6.0,
-            "CTR": 1.5,
-        },
-    ]
-
-
-def _load_campaign_metrics() -> List[Dict[str, Any]]:
-    """
-    Load current campaign metrics.
-
-    Primary source:
-        mock_data/campaign_metrics.json
-
-    Until Member 2's file is available, a small fallback dataset
-    is used so BudgetAgent can still be developed and tested.
-
-    Supports either:
-        [
-            {...},
-            {...}
-        ]
-
-    or:
-        {
-            "campaigns": [
-                {...},
-                {...}
-            ]
-        }
-    """
-    base_dir = Path(__file__).resolve().parents[1]
-    metrics_path = base_dir / "mock_data" / "campaign_metrics.json"
-
-    fallback = _fallback_campaign_metrics()
-
-    if not metrics_path.exists():
-        logger.warning(
-            "campaign_metrics.json not found; using temporary fallback data"
-        )
-        return fallback
-
-    try:
-        raw_data = json.loads(
-            metrics_path.read_text(encoding="utf-8")
-        )
-    except Exception:
-        logger.exception(
-            "Failed to read campaign_metrics.json; using fallback data"
-        )
-        return fallback
-
-    # Member 2 may provide a plain list.
-    if isinstance(raw_data, list):
-        return [
-            item
-            for item in raw_data
-            if isinstance(item, dict)
-        ]
-
-    # Also support {"campaigns": [...]}.
-    if isinstance(raw_data, dict):
-        campaigns = raw_data.get("campaigns")
-
-        if isinstance(campaigns, list):
-            return [
-                item
-                for item in campaigns
-                if isinstance(item, dict)
-            ]
-
-    logger.warning(
-        "Unsupported campaign_metrics.json structure; using fallback data"
-    )
-    return fallback
+ROAS_DECLINE_THRESHOLD = 0.15
+CTR_DECLINE_THRESHOLD = 0.10
+CPM_INCREASE_THRESHOLD = 0.15
 
 
 def _safe_float(value: Any) -> float:
-    """Convert a metric to float without crashing the agent."""
+    """Convert metric values to float without crashing."""
     try:
         return float(value or 0)
     except (TypeError, ValueError):
         return 0.0
 
 
+def _fallback_campaign_metrics() -> List[Dict[str, Any]]:
+    """
+    Small fallback dataset used only when Member 2's
+    campaign_metrics.json cannot be loaded.
+    """
+    return [
+        {
+            "name": "Fallback Low Efficiency Campaign",
+            "current_CPM": 24.0,
+            "prev_CPM": 18.0,
+            "current_CTR": 0.8,
+            "prev_CTR": 1.2,
+            "current_ROAS": 0.8,
+            "prev_ROAS": 1.4,
+            "spend": 60000.0,
+            "impressions": 2500000,
+        },
+        {
+            "name": "Fallback Strong Campaign",
+            "current_CPM": 10.0,
+            "prev_CPM": 11.0,
+            "current_CTR": 2.2,
+            "prev_CTR": 1.9,
+            "current_ROAS": 3.5,
+            "prev_ROAS": 3.0,
+            "spend": 30000.0,
+            "impressions": 1800000,
+        },
+    ]
+
+
+def _load_campaign_metrics() -> List[Dict[str, Any]]:
+    """
+    Load current campaign metrics from Member 2's file.
+
+    Supported formats:
+
+    [
+        {...},
+        {...}
+    ]
+
+    or:
+
+    {
+        "campaigns": [
+            {...},
+            {...}
+        ]
+    }
+    """
+    base_dir = Path(__file__).resolve().parents[1]
+    metrics_path = (
+        base_dir
+        / "mock_data"
+        / "campaign_metrics.json"
+    )
+
+    if not metrics_path.exists():
+        logger.warning(
+            "campaign_metrics.json not found; "
+            "using fallback campaign data"
+        )
+        return _fallback_campaign_metrics()
+
+    try:
+        raw_data = json.loads(
+            metrics_path.read_text(
+                encoding="utf-8"
+            )
+        )
+    except Exception:
+        logger.exception(
+            "Failed to load campaign_metrics.json; "
+            "using fallback data"
+        )
+        return _fallback_campaign_metrics()
+
+    if isinstance(raw_data, list):
+        campaigns = [
+            item
+            for item in raw_data
+            if isinstance(item, dict)
+        ]
+
+        if campaigns:
+            return campaigns
+
+    if isinstance(raw_data, dict):
+        campaigns = raw_data.get(
+            "campaigns"
+        )
+
+        if isinstance(campaigns, list):
+            valid_campaigns = [
+                item
+                for item in campaigns
+                if isinstance(item, dict)
+            ]
+
+            if valid_campaigns:
+                return valid_campaigns
+
+    logger.warning(
+        "Unsupported or empty campaign metrics structure; "
+        "using fallback data"
+    )
+
+    return _fallback_campaign_metrics()
+
+
+def _percentage_change(
+    current: float,
+    previous: float,
+) -> float:
+    """
+    Calculate relative change.
+
+    Example:
+    previous = 2.9
+    current = 2.35
+    returns approximately -0.1897 (-18.97%)
+    """
+    if previous == 0:
+        return 0.0
+
+    return (
+        current - previous
+    ) / abs(previous)
+
+
 def _identify_budget_drains(
     metrics: List[Dict[str, Any]],
 ) -> List[Dict[str, Any]]:
     """
-    Identify campaigns that may be inefficient.
+    Identify campaigns requiring budget review.
 
-    Prototype heuristics:
-    1. High spend + ROAS below 1.0
-    2. Very high CPM + very low CTR
+    A campaign is flagged when:
+
+    1. Current ROAS is below 1.0
+
+    OR
+
+    2. Efficiency is materially deteriorating:
+       - ROAS falls at least 15%, together with
+       - CTR falling at least 10% or CPM increasing at least 15%.
+
+    These rules are prototype decision-support heuristics.
+    They do not automatically modify advertising budgets.
     """
     drains: List[Dict[str, Any]] = []
 
     for campaign in metrics:
-        spend = _safe_float(campaign.get("spend"))
-        roas = _safe_float(campaign.get("ROAS"))
-        cpm = _safe_float(campaign.get("CPM"))
-        ctr = _safe_float(campaign.get("CTR"))
+        current_roas = _safe_float(
+            campaign.get("current_ROAS")
+        )
+        previous_roas = _safe_float(
+            campaign.get("prev_ROAS")
+        )
+
+        current_ctr = _safe_float(
+            campaign.get("current_CTR")
+        )
+        previous_ctr = _safe_float(
+            campaign.get("prev_CTR")
+        )
+
+        current_cpm = _safe_float(
+            campaign.get("current_CPM")
+        )
+        previous_cpm = _safe_float(
+            campaign.get("prev_CPM")
+        )
+
+        spend = _safe_float(
+            campaign.get("spend")
+        )
+
+        roas_change = _percentage_change(
+            current_roas,
+            previous_roas,
+        )
+
+        ctr_change = _percentage_change(
+            current_ctr,
+            previous_ctr,
+        )
+
+        cpm_change = _percentage_change(
+            current_cpm,
+            previous_cpm,
+        )
 
         reasons: List[str] = []
 
-        if (
-            spend > HIGH_SPEND_THRESHOLD
-            and roas < LOW_ROAS_THRESHOLD
-        ):
+        low_roas = (
+            current_roas < LOW_ROAS_THRESHOLD
+        )
+
+        significant_roas_decline = (
+            roas_change <= -ROAS_DECLINE_THRESHOLD
+        )
+
+        significant_ctr_decline = (
+            ctr_change <= -CTR_DECLINE_THRESHOLD
+        )
+
+        significant_cpm_increase = (
+            cpm_change >= CPM_INCREASE_THRESHOLD
+        )
+
+        material_deterioration = (
+            significant_roas_decline
+            and (
+                significant_ctr_decline
+                or significant_cpm_increase
+            )
+        )
+
+        if low_roas:
             reasons.append(
-                "high spend with ROAS below 1.0"
+                "current ROAS is below 1.0"
             )
 
-        if (
-            cpm > HIGH_CPM_THRESHOLD
-            and ctr < LOW_CTR_THRESHOLD
-        ):
+        if material_deterioration:
             reasons.append(
-                "high CPM with low CTR"
+                "campaign efficiency is deteriorating"
             )
+
+            reasons.append(
+                f"ROAS decreased by "
+                f"{abs(roas_change) * 100:.1f}%"
+            )
+
+            if significant_ctr_decline:
+                reasons.append(
+                    f"CTR decreased by "
+                    f"{abs(ctr_change) * 100:.1f}%"
+                )
+
+            if significant_cpm_increase:
+                reasons.append(
+                    f"CPM increased by "
+                    f"{cpm_change * 100:.1f}%"
+                )
 
         if reasons:
             flagged = dict(campaign)
-            flagged["budget_drain_reasons"] = reasons
+
+            flagged[
+                "budget_drain_reasons"
+            ] = reasons
+
+            flagged[
+                "performance_changes"
+            ] = {
+                "ROAS_change_percent": round(
+                    roas_change * 100,
+                    2,
+                ),
+                "CTR_change_percent": round(
+                    ctr_change * 100,
+                    2,
+                ),
+                "CPM_change_percent": round(
+                    cpm_change * 100,
+                    2,
+                ),
+                "spend": spend,
+            }
+
             drains.append(flagged)
 
     return drains
@@ -183,55 +321,93 @@ def _build_retrieval_query(
     drains: List[Dict[str, Any]],
 ) -> str:
     """
-    Build a query that works well with the hybrid retrieval
-    logic implemented in ir/vector_store.py.
+    Build a natural-language retrieval query for the
+    historical ChromaDB campaign store.
     """
     if not drains:
         return (
-            "small budget high ROAS winner "
-            "successful campaign"
+            "successful campaign high ROAS "
+            "efficient budget scaling"
         )
 
     query_parts: List[str] = []
 
     for campaign in drains:
-        spend = _safe_float(campaign.get("spend"))
-        roas = _safe_float(campaign.get("ROAS"))
-        cpm = _safe_float(campaign.get("CPM"))
-        ctr = _safe_float(campaign.get("CTR"))
+        current_roas = _safe_float(
+            campaign.get("current_ROAS")
+        )
+
+        previous_roas = _safe_float(
+            campaign.get("prev_ROAS")
+        )
+
+        current_cpm = _safe_float(
+            campaign.get("current_CPM")
+        )
+
+        previous_cpm = _safe_float(
+            campaign.get("prev_CPM")
+        )
+
+        current_ctr = _safe_float(
+            campaign.get("current_CTR")
+        )
+
+        previous_ctr = _safe_float(
+            campaign.get("prev_CTR")
+        )
 
         parts = [
             "budget drain inefficient campaign",
+            "high spend",
         ]
 
-        if spend > HIGH_SPEND_THRESHOLD:
-            parts.append("high spend")
+        if current_roas < previous_roas:
+            parts.append(
+                "declining ROAS"
+            )
 
-        if roas < LOW_ROAS_THRESHOLD:
-            parts.append("low ROAS")
+        if current_cpm > previous_cpm:
+            parts.append(
+                "rising CPM"
+            )
 
-        if cpm > HIGH_CPM_THRESHOLD:
-            parts.append("high CPM")
+        if current_ctr < previous_ctr:
+            parts.append(
+                "declining CTR"
+            )
 
-        if ctr < LOW_CTR_THRESHOLD:
-            parts.append("low CTR")
+        query_parts.append(
+            " ".join(parts)
+        )
 
-        query_parts.append(" ".join(parts))
-
-    return "; ".join(query_parts)
+    return "; ".join(
+        query_parts
+    )
 
 
 def _retrieve_similar_campaigns(
     drains: List[Dict[str, Any]],
 ) -> List[Dict[str, Any]]:
     """
-    Retrieve relevant historical campaign precedents
-    from the ChromaDB IR component.
+    Retrieve relevant historical campaigns using
+    the IR vector store.
     """
     try:
-        from ir.vector_store import query_similar_campaigns
+        from ir.vector_store import (
+            query_similar_campaigns,
+        )
 
-        query_text = _build_retrieval_query(drains)
+        query_text = (
+            _build_retrieval_query(
+                drains
+            )
+        )
+
+        logger.info(
+            "BudgetAgent retrieval query: %s",
+            query_text,
+        )
 
         return query_similar_campaigns(
             query_text,
@@ -240,8 +416,10 @@ def _retrieve_similar_campaigns(
 
     except Exception:
         logger.exception(
-            "Vector store retrieval failed; continuing without RAG context"
+            "Vector-store retrieval failed; "
+            "continuing without RAG context"
         )
+
         return []
 
 
@@ -250,24 +428,29 @@ def _build_prompt(
     similar_campaigns: List[Dict[str, Any]],
 ) -> str:
     """
-    Build an explainable Gemini prompt using current metrics
-    and retrieved historical lessons.
+    Build the Gemini prompt using current campaign
+    evidence and retrieved historical lessons.
     """
     prompt_parts = [
         (
-            "You are the BudgetAgent in AdMitra, an AI-powered "
-            "digital marketing assistant for Sri Lankan SMEs."
+            "You are BudgetAgent in AdMitra, "
+            "an AI-powered digital marketing assistant "
+            "for Sri Lankan SMEs."
         ),
         (
-            "Your task is to provide budget optimization "
-            "recommendations for Meta Ads campaigns."
+            "Analyze Meta Ads campaign budget efficiency "
+            "and provide decision-support recommendations."
         ),
         (
-            "Do not claim that you directly changed any advertising "
-            "budget. Recommendations require human approval."
+            "You must not claim that you directly changed "
+            "or paused any advertising budget."
+        ),
+        (
+            "All financial or advertising budget changes "
+            "require human approval."
         ),
         "",
-        "Current flagged campaigns:",
+        "Campaigns requiring budget review:",
     ]
 
     if drains:
@@ -280,26 +463,39 @@ def _build_prompt(
             )
     else:
         prompt_parts.append(
-            "No clear budget drains were detected using the "
-            "prototype thresholds."
+            "No campaign currently meets the "
+            "budget-review heuristics."
         )
 
-    prompt_parts.append("")
-    prompt_parts.append(
-        "Relevant historical campaign precedents:"
+    prompt_parts.extend(
+        [
+            "",
+            (
+                "Relevant historical campaign "
+                "precedents:"
+            ),
+        ]
     )
 
     if similar_campaigns:
         for item in similar_campaigns:
-            metadata = item.get("metadata", {})
+            metadata = item.get(
+                "metadata",
+                {},
+            )
 
             prompt_parts.append(
                 (
                     f"- Campaign: "
-                    f"{metadata.get('campaign_name', metadata.get('id', 'Unknown'))}; "
-                    f"ROAS: {metadata.get('ROAS', 'N/A')}; "
-                    f"Spend: {metadata.get('spend', 'N/A')}; "
-                    f"Lesson: {metadata.get('lesson', 'No lesson available')}"
+                    f"{metadata.get('campaign_name', 'Unknown')}; "
+                    f"Historical ROAS: "
+                    f"{metadata.get('ROAS', 'N/A')}; "
+                    f"Historical spend: "
+                    f"{metadata.get('spend', 'N/A')}; "
+                    f"Outcome: "
+                    f"{metadata.get('outcome', 'N/A')}; "
+                    f"Lesson: "
+                    f"{metadata.get('lesson', 'N/A')}"
                 )
             )
     else:
@@ -310,45 +506,68 @@ def _build_prompt(
     prompt_parts.extend(
         [
             "",
-            "Provide concise and actionable budget advice.",
-            "For each recommendation:",
-            "- explain the reason using campaign metrics;",
-            "- use historical lessons when relevant;",
-            "- suggest whether to reduce, maintain, pause, or cautiously increase budget;",
-            "- avoid presenting prototype thresholds as universal rules;",
-            "- state that a human should approve financial changes.",
+            (
+                "Provide concise and actionable "
+                "budget recommendations."
+            ),
+            (
+                "Explain recommendations using "
+                "the current metrics and trends."
+            ),
+            (
+                "Use historical lessons only when "
+                "they are relevant."
+            ),
+            (
+                "State whether each flagged campaign "
+                "should be reviewed, reduced, maintained, "
+                "or cautiously reallocated."
+            ),
+            (
+                "Do not treat the prototype thresholds "
+                "as universal marketing rules."
+            ),
+            (
+                "Do not recommend an automatic financial action."
+            ),
+            (
+                "Clearly state that a human must approve "
+                "any budget modification."
+            ),
         ]
     )
 
-    prompt = "\n".join(prompt_parts)
+    prompt = "\n".join(
+        prompt_parts
+    )
 
-    return sanitize_input(prompt)
+    return sanitize_input(
+        prompt
+    )
 
 
 def _fallback_recommendation(
     drains: List[Dict[str, Any]],
 ) -> str:
     """
-    Produce deterministic recommendation text when Gemini
-    is unavailable.
-
-    This keeps the prototype testable but does not replace
-    the required LLM during the final integrated demo.
+    Deterministic recommendation used when Gemini
+    cannot be reached.
     """
     if not drains:
         return (
-            "No major budget drains were detected using the current "
-            "prototype thresholds. Review high-ROAS campaigns for "
-            "careful scaling and continue monitoring performance. "
-            "Any budget change requires human approval."
+            "No major campaign efficiency deterioration "
+            "was detected using the current prototype rules. "
+            "Continue monitoring performance before changing "
+            "budget allocations. Human approval is required "
+            "for any financial change."
         )
 
     recommendations: List[str] = []
 
     for campaign in drains:
         name = campaign.get(
-            "campaign_name",
-            campaign.get("id", "Unknown campaign"),
+            "name",
+            "Unknown campaign",
         )
 
         reasons = campaign.get(
@@ -356,18 +575,22 @@ def _fallback_recommendation(
             [],
         )
 
-        reason_text = ", ".join(reasons)
-
-        recommendations.append(
-            (
-                f"{name}: review or reduce budget because "
-                f"{reason_text}. Reallocate spend only after comparing "
-                f"against stronger-performing campaigns and receiving "
-                f"human approval."
-            )
+        recommendation = (
+            f"{name}: review the current budget because "
+            f"{'; '.join(reasons)}. "
+            "Consider reducing or reallocating spend only "
+            "after comparing against stronger campaigns and "
+            "reviewing retrieved historical evidence. "
+            "Any budget modification requires human approval."
         )
 
-    return " ".join(recommendations)
+        recommendations.append(
+            recommendation
+        )
+
+    return " ".join(
+        recommendations
+    )
 
 
 def _call_llm(
@@ -375,10 +598,10 @@ def _call_llm(
     drains: List[Dict[str, Any]],
 ) -> str:
     """
-    Generate a recommendation using Google Gemini.
+    Generate budget advice using Google Gemini.
 
-    Uses the google-generativeai SDK included in requirements.txt.
-    Falls back gracefully if the API key/model/service is unavailable.
+    Falls back safely if API credentials or the
+    Gemini service are unavailable.
     """
     api_key = (
         os.getenv("GOOGLE_API_KEY")
@@ -387,52 +610,73 @@ def _call_llm(
 
     if not api_key:
         logger.warning(
-            "Gemini API key not configured; using fallback recommendation"
+            "Gemini API key not configured; "
+            "using fallback recommendation"
         )
-        return _fallback_recommendation(drains)
+
+        return _fallback_recommendation(
+            drains
+        )
 
     try:
         import google.generativeai as genai
 
-        genai.configure(api_key=api_key)
+        genai.configure(
+            api_key=api_key
+        )
 
         model_name = os.getenv(
             "GEMINI_MODEL",
             "gemini-1.5-flash",
         )
 
-        model = genai.GenerativeModel(model_name)
+        model = genai.GenerativeModel(
+            model_name
+        )
 
-        response = model.generate_content(prompt)
+        response = model.generate_content(
+            prompt
+        )
 
-        text = getattr(response, "text", None)
+        text = getattr(
+            response,
+            "text",
+            None,
+        )
 
         if text and text.strip():
             return text.strip()
 
         logger.warning(
-            "Gemini returned an empty response; using fallback"
+            "Gemini returned an empty response; "
+            "using fallback recommendation"
         )
 
     except Exception:
         logger.exception(
-            "Gemini generation failed; using fallback recommendation"
+            "Gemini generation failed; "
+            "using fallback recommendation"
         )
 
-    return _fallback_recommendation(drains)
+    return _fallback_recommendation(
+        drains
+    )
 
 
 def _historical_lessons(
     similar_campaigns: List[Dict[str, Any]],
 ) -> List[Dict[str, Any]]:
     """
-    Produce a compact explainability view of the historical
-    evidence used by BudgetAgent.
+    Return a compact explainability view of
+    retrieved historical evidence.
     """
     evidence: List[Dict[str, Any]] = []
 
     for item in similar_campaigns:
-        metadata = item.get("metadata", {})
+        metadata = item.get(
+            "metadata",
+            {},
+        )
 
         evidence.append(
             {
@@ -444,8 +688,16 @@ def _historical_lessons(
                     "campaign_name",
                     "",
                 ),
-                "ROAS": metadata.get("ROAS"),
-                "spend": metadata.get("spend"),
+                "ROAS": metadata.get(
+                    "ROAS"
+                ),
+                "spend": metadata.get(
+                    "spend"
+                ),
+                "outcome": metadata.get(
+                    "outcome",
+                    "",
+                ),
                 "lesson": metadata.get(
                     "lesson",
                     "",
@@ -458,25 +710,43 @@ def _historical_lessons(
 
 def run(input: Dict) -> Dict:
     """
-    MCP-style entry point for BudgetAgent.
+    MCP-style BudgetAgent entry point.
 
-    Returns:
-    {
-        "status": "success" | "error",
-        "result": {...},
-        "agent": "BudgetAgent",
-        "timestamp": "..."
-    }
+    Current metrics are normally loaded from
+    mock_data/campaign_metrics.json.
+
+    An optional input["campaigns"] list can also
+    be supplied by the orchestrator in future.
     """
     timestamp = datetime.now(
         timezone.utc
     ).isoformat()
 
     try:
-        metrics = _load_campaign_metrics()
+        input_campaigns = (
+            input.get("campaigns")
+            if isinstance(input, dict)
+            else None
+        )
 
-        drains = _identify_budget_drains(
-            metrics
+        if isinstance(
+            input_campaigns,
+            list,
+        ) and input_campaigns:
+            metrics = [
+                item
+                for item in input_campaigns
+                if isinstance(item, dict)
+            ]
+        else:
+            metrics = (
+                _load_campaign_metrics()
+            )
+
+        drains = (
+            _identify_budget_drains(
+                metrics
+            )
         )
 
         similar_campaigns = (
@@ -490,33 +760,47 @@ def run(input: Dict) -> Dict:
             similar_campaigns,
         )
 
-        recommendation = _call_llm(
-            prompt,
-            drains,
+        recommendation = (
+            _call_llm(
+                prompt,
+                drains,
+            )
         )
 
         result: Dict[str, Any] = {
+            "campaigns_analyzed": len(
+                metrics
+            ),
             "flagged_campaigns": drains,
-            "similar_campaigns": similar_campaigns,
-            "historical_evidence": _historical_lessons(
+            "similar_campaigns": (
                 similar_campaigns
+            ),
+            "historical_evidence": (
+                _historical_lessons(
+                    similar_campaigns
+                )
             ),
             "recommendation": recommendation,
             "decision_basis": {
                 "prototype_rules": [
                     (
-                        "spend > 500 and ROAS < 1.0"
+                        "Flag if current ROAS < 1.0"
                     ),
                     (
-                        "CPM > 25 and CTR < 0.5"
+                        "Flag material deterioration when "
+                        "ROAS decreases >= 15% and either "
+                        "CTR decreases >= 10% or "
+                        "CPM increases >= 15%"
                     ),
                 ],
                 "retrieval_method": (
-                    "ChromaDB semantic retrieval with "
-                    "metric-aware reranking"
+                    "ChromaDB semantic retrieval "
+                    "with metric-aware reranking"
                 ),
             },
-            "action_mode": "recommendation_only",
+            "action_mode": (
+                "recommendation_only"
+            ),
             "requires_human_approval": True,
         }
 
