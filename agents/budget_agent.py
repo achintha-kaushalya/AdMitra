@@ -825,7 +825,6 @@ def run(input: Dict) -> Dict:
             "timestamp": timestamp,
         }
 
-
 if __name__ == "__main__":
     output = run({})
 
