@@ -197,7 +197,7 @@ def fetch_live_campaign_metrics() -> Optional[List[Dict[str, Any]]]:
         return None
 
     try:
-        url = f"{GRAPH_BASE_URL}/{act_id}/campaigns?fields=id,name,status,effective_status,objective,insights.date_preset(maximum){{spend,impressions,cpm,ctr,actions,purchase_roas}}&limit=25&access_token={token}"
+        url = f"{GRAPH_BASE_URL}/{act_id}/campaigns?fields=id,name,status,effective_status,start_time,stop_time,objective,insights.date_preset(maximum){{spend,impressions,cpm,ctr,actions,purchase_roas}}&limit=25&access_token={token}"
         res = httpx.get(url, timeout=8.0)
         if res.status_code != 200:
             return None
@@ -215,9 +215,29 @@ def fetch_live_campaign_metrics() -> Optional[List[Dict[str, Any]]]:
             roas_list = insights.get("purchase_roas", [])
             roas = float(roas_list[0].get("value", 0.0) or 0.0) if roas_list else (2.5 if spend > 0 else 0.0)
 
-            # Determine real effective status
+            # Determine real effective status & schedule completion
             eff_status = str(camp.get("effective_status") or camp.get("status") or "PAUSED").upper()
-            status = "ACTIVE" if "ACTIVE" in eff_status else ("COMPLETED" if "COMPLETED" in eff_status else "PAUSED")
+            stop_time = camp.get("stop_time")
+            
+            # Check if campaign or ad set schedule ended in the past
+            is_expired = False
+            if stop_time:
+                try:
+                    # ISO format parsing
+                    from datetime import datetime, timezone
+                    import dateutil.parser
+                    end_dt = dateutil.parser.parse(stop_time)
+                    if end_dt < datetime.now(timezone.utc):
+                        is_expired = True
+                except Exception:
+                    pass
+
+            if "COMPLETED" in eff_status or is_expired:
+                status = "COMPLETED"
+            elif "ACTIVE" in eff_status:
+                status = "ACTIVE"
+            else:
+                status = "PAUSED"
 
             # Synthesize realistic benchmark comparison
             metrics_list.append({
