@@ -125,27 +125,14 @@ def _build_prompt(
 
 
 def _generate_explanation(prompt: str, metrics: list[dict[str, Any]] = []) -> str:
-    load_dotenv()
-
-    api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
-
-    if not api_key:
-        return _fallback_performance_summary(metrics)
-
+    fallback = _fallback_performance_summary(metrics)
     try:
-        from google import genai
-        client = genai.Client(api_key=api_key)
-        response = client.models.generate_content(
-            model=os.getenv("LLM_MODEL", "gemini-3.5-flash"),
-            contents=sanitize_input(prompt),
-        )
-        text = getattr(response, "text", None)
-        if text:
-            return text.strip()
+        from shared.llm_provider import generate_text
+        system_prompt = "You are a senior digital marketing analytics executive reviewing campaign metrics."
+        text, _ = generate_text(prompt, system_prompt=system_prompt, fallback_text=fallback)
+        return text if text else fallback
     except Exception:
-        pass
-
-    return _fallback_performance_summary(metrics)
+        return fallback
 
 
 def _fallback_performance_summary(metrics: list[dict[str, Any]]) -> str:

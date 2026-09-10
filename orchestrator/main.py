@@ -172,23 +172,34 @@ def run_agent(request: MCPRequest) -> dict[str, Any]:
     return _call_agent(request.task, request.payload)
 
 
+from concurrent.futures import ThreadPoolExecutor
+
 @app.post("/check-account", tags=["Agents"])
 def check_account(body: dict[str, Any] = {}) -> dict[str, Any]:
     """
-    Run ALL 5 agents using the supplied body as shared context.
+    Run ALL 5 agents in parallel using ThreadPoolExecutor for lightning-fast response.
     Each agent receives the full body dict as its payload.
 
     Returns:
         Aggregated dict with results from every agent keyed by task name.
     """
-    results: dict[str, Any] = {}
-    for task, config in AGENT_REGISTRY.items():
-        # Merge default payload with any user-provided values
+    tasks = list(AGENT_REGISTRY.keys())
+
+    def _execute(task_name: str) -> tuple[str, dict[str, Any]]:
+        config = AGENT_REGISTRY[task_name]
         payload = {**config["default_payload"], **body}
-        results[task] = _call_agent(task, payload)
+        return task_name, _call_agent(task_name, payload)
+
+    results: dict[str, Any] = {}
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        futures = [executor.submit(_execute, t) for t in tasks]
+        for f in futures:
+            task_name, res = f.result()
+            results[task_name] = res
+
     return {
         "status": "success",
-        "agents_run": list(AGENT_REGISTRY.keys()),
+        "agents_run": tasks,
         "results": results,
         "timestamp": datetime.utcnow().isoformat(),
     }

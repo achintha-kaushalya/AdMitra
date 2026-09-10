@@ -32,26 +32,33 @@ def _load_past_campaigns_json() -> List[Dict]:
         return []
 
 
+_CHROMA_CLIENT = None
+_CHROMA_COLLECTION = None
+
 def initialize_store():
     """
     Initialize and return the persistent ChromaDB collection.
     """
+    global _CHROMA_CLIENT, _CHROMA_COLLECTION
+    if _CHROMA_COLLECTION is not None:
+        return _CHROMA_COLLECTION
 
     persist_dir = os.path.abspath(CHROMA_DIR)
     os.makedirs(persist_dir, exist_ok=True)
 
     settings = Settings(anonymized_telemetry=False)
 
-    client = chromadb.PersistentClient(
-        path=persist_dir,
-        settings=settings,
-    )
+    if _CHROMA_CLIENT is None:
+        _CHROMA_CLIENT = chromadb.PersistentClient(
+            path=persist_dir,
+            settings=settings,
+        )
 
-    collection = client.get_or_create_collection(
+    _CHROMA_COLLECTION = _CHROMA_CLIENT.get_or_create_collection(
         name=COLLECTION_NAME
     )
 
-    return collection
+    return _CHROMA_COLLECTION
 
 
 def seed_campaigns(collection) -> None:
@@ -327,9 +334,97 @@ def query_similar_campaigns(
     return final_results
 
 
+def sync_live_meta_campaigns() -> tuple[int, str]:
+    """
+    Enterprise Sync: Ingests all historical campaigns and insights from the connected 
+    Meta Ad Account into ChromaDB vector memory for AI performance intelligence.
+    """
+    try:
+        from shared.meta_api import fetch_all_historical_campaigns
+        historical_camps = fetch_all_historical_campaigns(max_campaigns=100)
+    except Exception as exc:
+        return 0, f"Failed to connect to Meta API: {exc}"
+
+    if not historical_camps:
+        return 0, "No historical campaigns retrieved from Meta API"
+
+    collection = initialize_store()
+    ids = []
+    documents = []
+    metadatas = []
+
+    for camp in historical_camps:
+        camp_id = str(camp.get("id"))
+        name = camp.get("name", "Campaign")
+        spend = float(camp.get("spend", 0.0) or 0.0)
+        cpm = float(camp.get("cpm", 0.0) or 0.0)
+        ctr = float(camp.get("ctr", 0.0) or 0.0)
+        roas = float(camp.get("roas", 0.0) or 0.0)
+        status = camp.get("status", "PAUSED")
+        objective = camp.get("objective", "OUTCOME_SALES")
+
+        # Synthesize strategic lesson from performance
+        if roas >= 3.0:
+            outcome = "High Return Winner"
+            lesson = f"Exceptional conversion efficiency at {roas:.2f}x ROAS. Maintain proven copy angle and creative format."
+        elif ctr >= 2.0 and roas < 1.5:
+            outcome = "High Engagement Low Conversion"
+            lesson = f"Strong CTR ({ctr:.2f}%) but lower ROAS ({roas:.2f}x). Optimize checkout funnel and product landing page."
+        elif cpm > 2.0:
+            outcome = "High CPM Fatigue"
+            lesson = f"Elevated CPM (${cpm:.2f}). Expand audience targeting and refresh visual hooks to lower auction costs."
+        else:
+            outcome = "Standard Delivery"
+            lesson = f"Baseline campaign performance (CPM: ${cpm:.2f}, CTR: {ctr:.2f}%, Spend: ${spend:.2f})."
+
+        doc = (
+            f"Campaign name: {name}. "
+            f"Objective: {objective}. "
+            f"Status: {status}. "
+            f"CPM: {cpm}. "
+            f"CTR: {ctr}. "
+            f"ROAS: {roas}. "
+            f"Spend: {spend}. "
+            f"Outcome: {outcome}. "
+            f"Lesson: {lesson}"
+        )
+
+        meta = {
+            "id": f"meta_{camp_id}",
+            "campaign_name": name,
+            "objective": objective,
+            "status": status,
+            "CPM": cpm,
+            "CTR": ctr,
+            "ROAS": roas,
+            "spend": spend,
+            "outcome": outcome,
+            "lesson": lesson,
+            "source": "meta_graph_api"
+        }
+
+        ids.append(f"meta_{camp_id}")
+        documents.append(doc)
+        metadatas.append(meta)
+
+    try:
+        # Upsert into ChromaDB
+        collection.upsert(
+            ids=ids,
+            documents=documents,
+            metadatas=metadatas
+        )
+        logger.info(f"Successfully ingested {len(ids)} Meta historical campaigns into ChromaDB")
+        return len(ids), f"Successfully indexed {len(ids)} historical Meta campaigns into ChromaDB RAG memory!"
+    except Exception as exc:
+        logger.exception("Error syncing Meta campaigns to ChromaDB")
+        return 0, f"ChromaDB upsert error: {exc}"
+
+
 __all__ = [
     "initialize_store",
     "seed_campaigns",
     "query_similar_campaigns",
     "get_or_create_store",
+    "sync_live_meta_campaigns",
 ]

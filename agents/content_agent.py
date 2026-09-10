@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import json
 import os
-import re
 from datetime import datetime, timezone
 from typing import Any
 
@@ -12,26 +10,23 @@ import warnings
 warnings.filterwarnings("ignore", category=FutureWarning)
 
 try:
-    import google.generativeai as genai
-except ImportError:  # pragma: no cover - exercised when optional dependencies are absent
-    genai = None
-
-try:
     from dotenv import load_dotenv
-except ImportError:  # pragma: no cover - optional dependency fallback
-    load_dotenv = None
-
-if load_dotenv is not None:
     load_dotenv()
+except ImportError:
+    pass
 
 try:
     from shared.mcp_schema import MCPResponse
     from shared.security import sanitize_input
-except ImportError:  # pragma: no cover - supports direct module use from partial checkouts
+    from shared.llm_provider import generate_json
+except ImportError:
     MCPResponse = None
 
     def sanitize_input(text: str) -> str:
         return text
+
+    def generate_json(prompt: str, system_prompt: str = None, fallback_dict: dict = None):
+        return fallback_dict or {}, "local_fallback"
 
 
 AGENT_NAME = "ContentAgent"
@@ -55,7 +50,7 @@ def _response(status: str, result: dict[str, Any]) -> dict[str, Any]:
 
 
 def _fallback_creative(product: str, offer: str, tone: str) -> dict[str, Any]:
-    """Return usable local copy when Gemini is unavailable."""
+    """Return usable local copy when LLMs are unavailable."""
     headline = f"{product}: {offer}"[:40]
     body = f"Discover {product} today and enjoy {offer}."[:125]
     cta = "Shop now"
@@ -71,52 +66,42 @@ def _fallback_creative(product: str, offer: str, tone: str) -> dict[str, Any]:
     }
 
 
-def _extract_json(text: str) -> dict[str, Any]:
-    cleaned = text.strip()
-    fenced = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", cleaned, re.DOTALL)
-    if fenced:
-        cleaned = fenced.group(1)
-    parsed = json.loads(cleaned)
-    if not isinstance(parsed, dict):
-        raise ValueError("Gemini response must be a JSON object")
-    return parsed
-
-
-def _generate_with_gemini(product: str, offer: str, tone: str) -> dict[str, Any]:
-    api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
-    if genai is None or not api_key:
-        return _fallback_creative(product, offer, tone)
-
-    genai.configure(api_key=api_key)
-    model_name = os.getenv("LLM_MODEL", "gemini-3.6-flash")
-    model = genai.GenerativeModel(model_name)
+def _generate_creative(product: str, offer: str, tone: str) -> dict[str, Any]:
+    fallback = _fallback_creative(product, offer, tone)
+    
     prompt = f"""
 Create bilingual digital ad copy for the product below.
 Product: {product}
 Offer: {offer}
 Tone: {tone}
 
-Return JSON only with this exact shape:
+Return JSON with this exact shape:
 {{
-  "english": {{"headline": "", "body": "", "call_to_action": ""}},
-  "sinhala": {{"headline": "", "body": "", "call_to_action": ""}},
+  "english": {{"headline": "Headline under 40 chars", "body": "Body under 125 chars", "call_to_action": "Shop now"}},
+  "sinhala": {{"headline": "සිංහල සිරස්තලය (under 40 chars)", "body": "සිංහල විස්තරය (under 125 chars)", "call_to_action": "දැන් මිලදී ගන්න"}},
   "tone": "{tone}"
 }}
 Keep each headline at most 40 characters and each body at most 125 characters.
 Adapt the Sinhala copy naturally for Sri Lankan customers; do not transliterate it.
 """
-    response = model.generate_content(prompt)
-    creative = _extract_json(response.text)
+    system_prompt = "You are a professional bilingual marketing copywriter specializing in English and Sinhala (සිංහල) Meta ads."
+    
+    data, source = generate_json(prompt, system_prompt=system_prompt, fallback_dict=fallback)
     
     # Enforce character limits safety
-    for lang in ["english", "sinhala"]:
-        if lang in creative and isinstance(creative[lang], dict):
-            creative[lang]["headline"] = str(creative[lang].get("headline", ""))[:40]
-            creative[lang]["body"] = str(creative[lang].get("body", ""))[:125]
+    if "english" not in data or "sinhala" not in data:
+        data = fallback
 
-    creative["tone"] = tone
-    creative["source"] = model_name
-    return creative
+    for lang in ["english", "sinhala"]:
+        if lang in data and isinstance(data[lang], dict):
+            data[lang]["headline"] = str(data[lang].get("headline", f"{product}"))[:40]
+            data[lang]["body"] = str(data[lang].get("body", f"{offer}"))[:125]
+            if "call_to_action" not in data[lang] or not data[lang]["call_to_action"]:
+                data[lang]["call_to_action"] = "Shop now" if lang == "english" else "දැන් මිලදී ගන්න"
+
+    data["tone"] = tone
+    data["source"] = source
+    return data
 
 
 def run(input: dict) -> dict:
@@ -132,7 +117,5 @@ def run(input: dict) -> dict:
     if tone not in _VALID_TONES:
         return _response("error", {"message": "Tone must be urgent, friendly, or professional."})
 
-    try:
-        return _response("success", _generate_with_gemini(product, offer, tone))
-    except Exception:
-        return _response("success", _fallback_creative(product, offer, tone))
+    creative = _generate_creative(product, offer, tone)
+    return _response("success", creative)

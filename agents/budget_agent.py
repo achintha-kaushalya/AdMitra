@@ -610,49 +610,14 @@ def _call_llm(
             drains
         )
 
+    fallback = _fallback_recommendation(drains)
     try:
-        import google.generativeai as genai
-
-        genai.configure(
-            api_key=api_key
-        )
-
-        model_name = os.getenv(
-            "LLM_MODEL",
-            os.getenv("GEMINI_MODEL", "gemini-3.5-flash"),
-        )
-
-        model = genai.GenerativeModel(
-            model_name
-        )
-
-        response = model.generate_content(
-            prompt
-        )
-
-        text = getattr(
-            response,
-            "text",
-            None,
-        )
-
-        if text and text.strip():
-            return text.strip()
-
-        logger.warning(
-            "Gemini returned an empty response; "
-            "using fallback recommendation"
-        )
-
+        from shared.llm_provider import generate_text
+        system_prompt = "You are an autonomous marketing budget optimization advisor."
+        text, _ = generate_text(prompt, system_prompt=system_prompt, fallback_text=fallback)
+        return text if text else fallback
     except Exception:
-        logger.exception(
-            "Gemini generation failed; "
-            "using fallback recommendation"
-        )
-
-    return _fallback_recommendation(
-        drains
-    )
+        return fallback
 
 
 def _historical_lessons(
