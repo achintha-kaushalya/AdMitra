@@ -1394,21 +1394,36 @@ def _render_content_tab(data: dict[str, Any]) -> None:
             default_prompt = f"extreme close-up hero shot of {product_hint}, centered commercial product photography, dramatic softbox lighting, 8k commercial ad asset"
             t2i_prompt = st.text_area("AI Visual Prompt", value=default_prompt, height=80, key="t2i_prompt_input")
             
+            # Poster Customization Expandable
+            with st.expander("🛠️ Poster Branding & Typography Settings", expanded=False):
+                p_c1, p_c2 = st.columns(2)
+                with p_c1:
+                    custom_shop = st.text_input("Brand / Shop Name", value=st.session_state.get("custom_shop_name", "Lanka Ads"), key="in_shop_name")
+                    st.session_state["custom_shop_name"] = custom_shop
+                    custom_badge = st.text_input("Top Right Promo Badge", value=st.session_state.get("last_offer", "RS. 10,000 OFF"), key="in_badge_text")
+                with p_c2:
+                    custom_contact = st.text_input("Bottom CTA Text / WhatsApp", value=st.session_state.get("custom_contact", "WhatsApp: 078 183 3131 | Lanka Ads"), key="in_contact_text")
+                    st.session_state["custom_contact"] = custom_contact
+
             # Allow toggling commercial poster overlay
             overlay_toggle = st.checkbox("🎨 Apply Commercial Sinhala & English Ad Overlay (Badges + Typography)", value=True, key="chk_ad_overlay")
 
             if st.button("🪄 Generate 8K Ad Poster", type="primary", use_container_width=True):
                 with st.spinner("Rendering 8K commercial ad creative & applying Sinhala typography overlays..."):
                     try:
-                        sin_head_val = sinhala.get("headline", "විශේෂ දීමනාව: 20% ක වට්ටමක්")
-                        eng_head_val = english.get("headline", "Special Offer: 20% OFF")
-                        offer_val = st.session_state.get("last_offer", "20% OFF")
+                        sin_head_val = st.session_state.get("edit_sin_head") or sinhala.get("headline", "iPhone 17 Pro Max සඳහා රු. 10,000 ක විශේෂ වට්ටමක්!")
+                        eng_head_val = st.session_state.get("edit_eng_head") or english.get("headline", "Flat Rs. 10,000 OFF • Lanka Ads")
+                        offer_val = st.session_state.get("in_badge_text") or st.session_state.get("last_offer", "RS. 10,000 OFF")
+                        shop_val = st.session_state.get("in_shop_name", "Lanka Ads")
+                        contact_val = st.session_state.get("in_contact_text", "WhatsApp: 078 183 3131 | Lanka Ads")
                         
                         img_url, img_bytes = generate_ad_image(
                             t2i_prompt,
                             headline_sinhala=sin_head_val,
                             headline_english=eng_head_val,
                             badge_text=offer_val,
+                            cta_text=contact_val,
+                            brand_name=shop_val,
                             apply_ad_compositing=overlay_toggle
                         )
                         st.session_state["creative_image_url"] = img_url
@@ -1499,6 +1514,8 @@ def _render_content_tab(data: dict[str, Any]) -> None:
                 """,
                 unsafe_allow_html=True
             )
+        if cur_bytes: st.image(cur_bytes, use_container_width=True)
+        elif cur_url: st.image(cur_url, use_container_width=True)
 
     # Right Column: Bilingual Copy Studios & Live Feed Previews
     with col_studio_right:
@@ -1506,9 +1523,6 @@ def _render_content_tab(data: dict[str, Any]) -> None:
             """
             <div class="glass-card" style="padding: 16px 18px; border-left: 4px solid #10b981;">
                 <h4 style="margin-top:0; color:#34d399; font-size: 1.05rem;">📝 2. Bilingual Copy Studios & Angles</h4>
-                <div style="font-size:0.80rem; color:#cbd5e1;">
-                    Select high-converting psychological angles tailored for English & Sinhala shoppers.
-                </div>
             </div>
             """,
             unsafe_allow_html=True
@@ -1517,65 +1531,35 @@ def _render_content_tab(data: dict[str, Any]) -> None:
         tab_copy_en, tab_copy_si = st.tabs(["🇬🇧 English Copy", "🇱🇰 Sinhala Copy (සිංහල)"])
 
         with tab_copy_en:
-            angle_options_en = [f"Angle {i+1}: {a.get('angle', 'Direct Value')}" for i, a in enumerate(eng_angles)] if eng_angles else ["Default Creative"]
+            angle_options_en = [f"Angle {i+1}: {a.get('angle', 'Value Proposition')}" for i, a in enumerate(eng_angles)] if eng_angles else ["Default Creative"]
             selected_en_idx = 0
             if eng_angles:
-                sel_en_angle = st.radio(
-                    "English Marketing Angle",
-                    options=range(len(angle_options_en)),
-                    format_func=lambda x: angle_options_en[x],
-                    key="radio_eng_angle",
-                    horizontal=True
-                )
+                sel_en_angle = st.radio("Select Marketing Angle Preset", options=range(len(angle_options_en)), format_func=lambda x: angle_options_en[x], key="radio_eng_angle", horizontal=True)
                 selected_en_idx = sel_en_angle
-                active_eng_head = eng_angles[selected_en_idx].get("headline", english.get("headline", ""))
-                active_eng_body = eng_angles[selected_en_idx].get("body", english.get("body", ""))
+                preset_eng_head = eng_angles[selected_en_idx].get("headline", english.get("headline", ""))
+                preset_eng_body = eng_angles[selected_en_idx].get("body", english.get("body", ""))
             else:
-                active_eng_head = english.get("headline", "N/A")
-                active_eng_body = english.get("body", "N/A")
-            
-            eng_cta = english.get("call_to_action", "Shop now")
+                preset_eng_head = english.get("headline", "Special Offer")
+                preset_eng_body = english.get("body", "Get amazing deals today!")
 
-            # Compliance Meters
-            head_len = len(active_eng_head)
-            body_len = len(active_eng_body)
-            st.markdown(f"**Headline** (`{head_len}/40 chars`):")
-            st.info(active_eng_head)
-            st.progress(min(head_len / 40.0, 1.0), text=f"Headline: {head_len}/40 chars")
+            active_eng_head = st.text_input("Headline (Max 40 chars)", value=preset_eng_head, key="edit_eng_head")
+            active_eng_body = st.text_area("Body Copy (Max 125 chars)", value=preset_eng_body, height=130, key="edit_eng_body")
+            eng_cta = st.text_input("Call to Action", value=english.get("call_to_action", "Shop Now"), key="edit_eng_cta")
 
-            st.markdown(f"**Body Copy** (`{body_len}/125 chars`):")
-            st.write(active_eng_body)
-            st.progress(min(body_len / 125.0, 1.0), text=f"Primary Text: {body_len}/125 chars")
+            st.progress(min(len(active_eng_head) / 40.0, 1.0))
+            st.progress(min(len(active_eng_body) / 125.0, 1.0))
 
-            # English Feed Mockup
-            st.markdown("##### 📱 Meta Feed Preview (English)")
             st.markdown(
                 f"""
                 <div class="ad-preview-box">
                     <div class="ad-header">
                         <div class="ad-avatar">AM</div>
                         <div>
-                            <div class="ad-brand-name">AdMitra Brand</div>
+                            <div class="ad-brand-name">{st.session_state.get('custom_shop_name', 'AdMitra')}</div>
                             <div class="ad-sponsored">Sponsored • 🌐</div>
                         </div>
                     </div>
-                    <div class="ad-body">{active_eng_body}</div>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
-            if st.session_state.get("creative_image_bytes"):
-                st.image(st.session_state["creative_image_bytes"], use_container_width=True)
-            elif st.session_state.get("creative_image_url"):
-                st.image(st.session_state["creative_image_url"], use_container_width=True)
-            else:
-                st.markdown('<div class="ad-media-placeholder"><div style="font-size:2rem;">🛍️</div><div style="font-size:0.85rem;font-weight:600;">Featured Product Creative</div></div>', unsafe_allow_html=True)
-            
-            st.markdown(
-                f"""
-                <div class="ad-headline-bar" style="margin-top: 6px;">
-                    <div class="ad-headline-text">{active_eng_head}</div>
-                    <div class="ad-cta-btn">{eng_cta}</div>
+                    <div class="ad-body" style="white-space: pre-wrap;">{active_eng_body}</div>
                 </div>
                 """,
                 unsafe_allow_html=True
@@ -1585,59 +1569,31 @@ def _render_content_tab(data: dict[str, Any]) -> None:
             angle_options_si = [f"Angle {i+1}: {a.get('angle', 'සෘජු දීමනාව')}" for i, a in enumerate(sin_angles)] if sin_angles else ["Default Creative"]
             selected_si_idx = 0
             if sin_angles:
-                sel_si_angle = st.radio(
-                    "සිංහල අලෙවිකරණ කෝණය",
-                    options=range(len(angle_options_si)),
-                    format_func=lambda x: angle_options_si[x],
-                    key="radio_sin_angle",
-                    horizontal=True
-                )
+                sel_si_angle = st.radio("සිංහල අලෙවිකරණ කෝණය තෝරන්න", options=range(len(angle_options_si)), format_func=lambda x: angle_options_si[x], key="radio_sin_angle", horizontal=True)
                 selected_si_idx = sel_si_angle
-                active_sin_head = sin_angles[selected_si_idx].get("headline", sinhala.get("headline", ""))
-                active_sin_body = sin_angles[selected_si_idx].get("body", sinhala.get("body", ""))
+                preset_sin_head = sin_angles[selected_si_idx].get("headline", sinhala.get("headline", ""))
+                preset_sin_body = sin_angles[selected_si_idx].get("body", sinhala.get("body", ""))
             else:
-                active_sin_head = sinhala.get("headline", "N/A")
-                active_sin_body = sinhala.get("body", "N/A")
+                preset_sin_head = sinhala.get("headline", "විශේෂ දීමනාවක්!")
+                preset_sin_body = sinhala.get("body", "අදම මිලදී ගන්න!")
 
-            sin_cta = sinhala.get("call_to_action", "දැන්ම ගන්න")
+            active_sin_head = st.text_input("ශීර්ෂ පාඨය (Headline)", value=preset_sin_head, key="edit_sin_head")
+            active_sin_body = st.text_area("ප්‍රධාන දැන්වීම් විස්තරය (Body Copy)", value=preset_sin_body, height=130, key="edit_sin_body")
+            sin_cta = st.text_input("ඇමතුම් ක්‍රියාව (CTA)", value=sinhala.get("call_to_action", "දැන්ම ඇනවුම් කරන්න"), key="edit_sin_cta")
 
-            # Compliance Meters
-            sin_head_len = len(active_sin_head)
-            sin_body_len = len(active_sin_body)
-            st.markdown(f"**Headline** (`{sin_head_len}/40 chars`):")
-            st.info(active_sin_head)
-            st.progress(min(sin_head_len / 40.0, 1.0), text=f"Headline: {sin_head_len}/40 chars")
+            st.progress(min(len(active_sin_head) / 40.0, 1.0))
+            st.progress(min(len(active_sin_body) / 125.0, 1.0))
 
-            st.markdown(f"**Body Copy** (`{sin_body_len}/125 chars`):")
-            st.write(active_sin_body)
-            st.progress(min(sin_body_len / 125.0, 1.0), text=f"Primary Text: {sin_body_len}/125 chars")
-
-            # Sinhala Feed Mockup
-            st.markdown("##### 📱 Meta Feed Preview (Sinhala)")
             st.markdown(
                 f"""
                 <div class="ad-preview-box">
                     <div class="ad-header">
                         <div class="ad-avatar">AM</div>
                         <div>
-                            <div class="ad-brand-name">AdMitra Brand</div>
+                            <div class="ad-brand-name">{st.session_state.get('custom_shop_name', 'AdMitra')}</div>
                             <div class="ad-sponsored">අනුග්‍රහය දක්වන ලදී • 🌐</div>
                         </div>
                     </div>
-                    <div class="ad-body">{active_sin_body}</div>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
-            if st.session_state.get("creative_image_bytes"):
-                st.image(st.session_state["creative_image_bytes"], use_container_width=True)
-            elif st.session_state.get("creative_image_url"):
-                st.image(st.session_state["creative_image_url"], use_container_width=True)
-            else:
-                st.markdown('<div class="ad-media-placeholder"><div style="font-size:2rem;">🛍️</div><div style="font-size:0.85rem;font-weight:600;">නිෂ්පාදන රූපය</div></div>', unsafe_allow_html=True)
-            
-            st.markdown(
-                f"""
                 <div class="ad-headline-bar" style="margin-top: 6px;">
                     <div class="ad-headline-text">{active_sin_head}</div>
                     <div class="ad-cta-btn">{sin_cta}</div>
