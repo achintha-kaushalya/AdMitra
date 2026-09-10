@@ -1366,257 +1366,247 @@ def _render_content_tab(data: dict[str, Any]) -> None:
     if "creative_image_bytes" not in st.session_state:
         st.session_state["creative_image_bytes"] = None
 
-    # -----------------------------------------------------------------------
-    # 1. AI Visual Creative Studio (Text-to-Image & Image-to-Image Virtual Model)
-    # -----------------------------------------------------------------------
-    st.markdown(
-        """
-        <div class="glass-card" style="padding: 16px 20px; border-left: 4px solid #6366f1; margin-bottom: 20px;">
-            <h4 style="margin-top:0; color:#818cf8; font-size: 1.05rem;">🎨 AI Visual Creative Studio & Virtual Product Placement</h4>
-            <div style="font-size:0.85rem; color:#cbd5e1;">
-                Generate photorealistic commercial product visuals or upload your item (e.g. dress, shoes, watch) and let AI place it on a modern model in a clean studio setting.
+    # Top Split Layout: [Left: Visual Creative Studio & Live Image Preview, Right: Psychological Copy Studio]
+    col_studio_left, col_studio_right = st.columns([1.1, 1.3])
+
+    with col_studio_left:
+        st.markdown(
+            """
+            <div class="glass-card" style="padding: 16px 18px; border-left: 4px solid #6366f1;">
+                <h4 style="margin-top:0; color:#818cf8; font-size: 1.05rem;">🎨 1. AI Visual Studio & Image Generator</h4>
+                <div style="font-size:0.80rem; color:#cbd5e1; margin-bottom: 8px;">
+                    Generate 8K ad graphics or place products on virtual models with Flux.1 AI.
+                </div>
             </div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+            """,
+            unsafe_allow_html=True
+        )
 
-    vis_mode = st.radio(
-        "Visual Generation Mode",
-        ["✨ Text-to-Image (AI Visual Generation)", "👗 Image-to-Image (Virtual Model & Studio Placement)", "📁 Direct Photo Upload"],
-        horizontal=True,
-        key="visual_gen_mode"
-    )
+        vis_mode = st.radio(
+            "Visual Mode",
+            ["✨ Text-to-Image", "👗 Model Placement", "📁 Direct Upload"],
+            horizontal=True,
+            key="visual_gen_mode"
+        )
 
-    if vis_mode == "✨ Text-to-Image (AI Visual Generation)":
-        v_col1, v_col2 = st.columns([3, 1])
-        with v_col1:
+        if vis_mode == "✨ Text-to-Image":
             product_hint = st.session_state.get("last_product", "Smart Noise-Canceling Headphones")
             default_prompt = f"{product_hint} on a minimalist modern studio table, dramatic cinematic lighting, clean backdrop, 8k commercial photography"
-            t2i_prompt = st.text_input("AI Visual Prompt", value=default_prompt, key="t2i_prompt_input")
-        with v_col2:
-            st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
-            if st.button("🪄 Generate Visual", type="primary", use_container_width=True):
+            t2i_prompt = st.text_area("AI Visual Prompt", value=default_prompt, height=80, key="t2i_prompt_input")
+            
+            if st.button("🪄 Generate 8K Ad Visual", type="primary", use_container_width=True):
                 with st.spinner("Rendering 8K commercial ad creative with Flux AI..."):
                     img_url, img_bytes = generate_ad_image(t2i_prompt)
                     st.session_state["creative_image_url"] = img_url
                     st.session_state["creative_image_bytes"] = img_bytes
-                    st.success("🎨 Visual generated successfully!")
+                    st.session_state["last_vis_status"] = "✅ Visual generated successfully!"
+                    st.rerun()
 
-    elif vis_mode == "👗 Image-to-Image (Virtual Model & Studio Placement)":
-        st.markdown(
-            "<div style='font-size:0.83rem; color:#a5b4fc; margin-bottom:8px;'>"
-            "💡 <b>How it works:</b> Upload your raw product image. Then enter instructions (e.g. <i>'Modern Asian model wearing this dress in bright white studio'</i>). AI will craft and render the photorealistic placement.</div>",
-            unsafe_allow_html=True
-        )
-        up_col1, up_col2 = st.columns([1.2, 1.8])
-        with up_col1:
-            uploaded_file = st.file_uploader("Upload Product Photo (PNG/JPG)", type=["png", "jpg", "jpeg"], key="prod_upload_img")
-            if uploaded_file:
-                st.image(uploaded_file, caption="Raw Product Photo", use_container_width=True)
-        with up_col2:
+        elif vis_mode == "👗 Model Placement":
+            st.caption("Upload product photo & prompt model placement (e.g. *'Modern model wearing this dress in bright white studio'*):")
+            uploaded_file = st.file_uploader("Upload Product (PNG/JPG)", type=["png", "jpg", "jpeg"], key="prod_upload_img")
             prod_name = st.text_input("Product Name", value=st.session_state.get("last_product", "Fashion Dress"), key="img2img_prod_name")
             transform_inst = st.text_area(
-                "AI Placement Prompt",
+                "Placement Prompt",
                 value="Modern elegant model wearing this outfit in a bright white studio background, commercial fashion photoshoot, soft lighting, 8k",
-                height=90,
+                height=75,
                 key="img2img_prompt"
             )
             if st.button("✨ Transform on Virtual Model", type="primary", use_container_width=True):
-                with st.spinner("Analyzing product features & synthesizing virtual studio model photoshoot..."):
+                with st.spinner("Synthesizing virtual studio model photoshoot..."):
                     raw_bytes = uploaded_file.getvalue() if uploaded_file else None
                     refined_p, img_url, img_bytes = transform_product_image(prod_name, transform_inst)
                     st.session_state["creative_image_url"] = img_url
                     st.session_state["creative_image_bytes"] = img_bytes
-                    st.success(f"👗 Placement rendered! Prompt: *{refined_p}*")
+                    st.session_state["last_vis_status"] = f"👗 Placement rendered! Prompt: {refined_p}"
+                    st.rerun()
 
-    else:
-        direct_file = st.file_uploader("Upload Final Finished Ad Poster (PNG/JPG)", type=["png", "jpg", "jpeg"], key="direct_upload_img")
-        if direct_file:
-            st.session_state["creative_image_bytes"] = direct_file.getvalue()
-            st.session_state["creative_image_url"] = None
-            st.success("✅ Creative poster uploaded & loaded into ad preview!")
+        else:
+            direct_file = st.file_uploader("Upload Ad Poster (PNG/JPG)", type=["png", "jpg", "jpeg"], key="direct_upload_img")
+            if direct_file:
+                st.session_state["creative_image_bytes"] = direct_file.getvalue()
+                st.session_state["creative_image_url"] = None
+                st.session_state["last_vis_status"] = "✅ Poster loaded!"
+                st.rerun()
 
-    st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+        # Status Message
+        if st.session_state.get("last_vis_status"):
+            st.success(st.session_state["last_vis_status"])
 
-    # -----------------------------------------------------------------------
-    # 2. Dedicated Visual Preview Card (if generated / uploaded)
-    # -----------------------------------------------------------------------
-    if st.session_state.get("creative_image_bytes") or st.session_state.get("creative_image_url"):
+        # Live Static Image Preview Panel (Left Side Dedicated Panel)
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("##### 🖼️ Visual Creative Preview Screen")
+        if st.session_state.get("creative_image_bytes"):
+            st.image(st.session_state["creative_image_bytes"], caption="AdMitra AI 1:1 Creative Visual (Ready to Publish)", use_container_width=True)
+            if st.button("🗑️ Reset / Clear Visual", use_container_width=True):
+                st.session_state["creative_image_bytes"] = None
+                st.session_state["creative_image_url"] = None
+                st.session_state["last_vis_status"] = None
+                st.rerun()
+        elif st.session_state.get("creative_image_url"):
+            st.image(st.session_state["creative_image_url"], caption="AdMitra AI 1:1 Creative Visual (Ready to Publish)", use_container_width=True)
+            if st.button("🗑️ Reset / Clear Visual", use_container_width=True):
+                st.session_state["creative_image_bytes"] = None
+                st.session_state["creative_image_url"] = None
+                st.session_state["last_vis_status"] = None
+                st.rerun()
+        else:
+            st.markdown(
+                """
+                <div style="border: 2px dashed #475569; border-radius: 12px; padding: 40px 20px; text-align: center; background: rgba(30, 41, 59, 0.4);">
+                    <div style="font-size: 2.5rem; margin-bottom: 8px;">🛍️</div>
+                    <div style="color: #94a3b8; font-size: 0.9rem; font-weight: 500;">No visual generated yet.</div>
+                    <div style="color: #64748b; font-size: 0.78rem; margin-top: 4px;">Click <b>Generate 8K Ad Visual</b> above to generate.</div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+    # Right Column: Bilingual Copy Studios & Live Feed Previews
+    with col_studio_right:
         st.markdown(
             """
-            <div class="glass-card" style="padding: 16px 20px; border-left: 4px solid #10b981; margin-bottom: 20px;">
-                <h4 style="margin-top:0; color:#34d399; font-size: 1.05rem;">🖼️ Generated Visual Ad Creative (8K Ready)</h4>
-                <div style="font-size:0.83rem; color:#cbd5e1;">Live visual rendered and synchronized across all feed ad preview mockups below.</div>
+            <div class="glass-card" style="padding: 16px 18px; border-left: 4px solid #10b981;">
+                <h4 style="margin-top:0; color:#34d399; font-size: 1.05rem;">📝 2. Bilingual Copy Studios & Angles</h4>
+                <div style="font-size:0.80rem; color:#cbd5e1;">
+                    Select high-converting psychological angles tailored for English & Sinhala shoppers.
+                </div>
             </div>
             """,
             unsafe_allow_html=True
         )
-        img_col1, img_col2 = st.columns([1.5, 2])
-        with img_col1:
-            if st.session_state.get("creative_image_bytes"):
-                st.image(st.session_state["creative_image_bytes"], caption="AdMitra AI 1:1 Creative Visual", use_container_width=True)
-            elif st.session_state.get("creative_image_url"):
-                st.image(st.session_state["creative_image_url"], caption="AdMitra AI 1:1 Creative Visual", use_container_width=True)
-        with img_col2:
-            st.info("✅ **Visual Synchronized**: This creative is loaded into both English and Sinhala Meta Feed Mockups and will be uploaded to your Facebook Page upon approval.")
-            if st.button("🗑️ Clear / Reset Visual", key="btn_clear_visual"):
-                st.session_state["creative_image_url"] = None
-                st.session_state["creative_image_bytes"] = None
-                st.rerun()
 
-    # -----------------------------------------------------------------------
-    # 3. Bilingual Copy & Live Mockups
-    # -----------------------------------------------------------------------
-    col_en, col_si = st.columns(2)
+        tab_copy_en, tab_copy_si = st.tabs(["🇬🇧 English Copy", "🇱🇰 Sinhala Copy (සිංහල)"])
 
-    with col_en:
-        st.markdown("### 🇬🇧 English Copy Studio")
-        
-        # Angle Selection
-        angle_options_en = [f"Angle {i+1}: {a.get('angle', 'Direct Value')}" for i, a in enumerate(eng_angles)] if eng_angles else ["Default Creative"]
-        selected_en_idx = 0
-        if eng_angles:
-            sel_en_angle = st.radio(
-                "Psychological Marketing Angle",
-                options=range(len(angle_options_en)),
-                format_func=lambda x: angle_options_en[x],
-                key="radio_eng_angle",
-                horizontal=True
-            )
-            selected_en_idx = sel_en_angle
-            active_eng_head = eng_angles[selected_en_idx].get("headline", english.get("headline", ""))
-            active_eng_body = eng_angles[selected_en_idx].get("body", english.get("body", ""))
-        else:
-            active_eng_head = english.get("headline", "N/A")
-            active_eng_body = english.get("body", "N/A")
-        
-        eng_cta = english.get("call_to_action", "Shop now")
+        with tab_copy_en:
+            angle_options_en = [f"Angle {i+1}: {a.get('angle', 'Direct Value')}" for i, a in enumerate(eng_angles)] if eng_angles else ["Default Creative"]
+            selected_en_idx = 0
+            if eng_angles:
+                sel_en_angle = st.radio(
+                    "English Marketing Angle",
+                    options=range(len(angle_options_en)),
+                    format_func=lambda x: angle_options_en[x],
+                    key="radio_eng_angle",
+                    horizontal=True
+                )
+                selected_en_idx = sel_en_angle
+                active_eng_head = eng_angles[selected_en_idx].get("headline", english.get("headline", ""))
+                active_eng_body = eng_angles[selected_en_idx].get("body", english.get("body", ""))
+            else:
+                active_eng_head = english.get("headline", "N/A")
+                active_eng_body = english.get("body", "N/A")
+            
+            eng_cta = english.get("call_to_action", "Shop now")
 
-        # Live Character Count Compliance
-        head_len = len(active_eng_head)
-        body_len = len(active_eng_body)
-        head_prog = min(head_len / 40.0, 1.0)
-        body_prog = min(body_len / 125.0, 1.0)
+            # Compliance Meters
+            head_len = len(active_eng_head)
+            body_len = len(active_eng_body)
+            st.markdown(f"**Headline** (`{head_len}/40 chars`):")
+            st.info(active_eng_head)
+            st.progress(min(head_len / 40.0, 1.0), text=f"Headline: {head_len}/40 chars")
 
-        st.markdown(f"**Headline** (`{head_len}/40 chars`):")
-        st.info(active_eng_head)
-        st.progress(head_prog, text=f"Meta Feed Headline Limit: {head_len}/40 characters" if head_len <= 40 else f"⚠️ Exceeds 40 chars ({head_len}/40)")
+            st.markdown(f"**Body Copy** (`{body_len}/125 chars`):")
+            st.write(active_eng_body)
+            st.progress(min(body_len / 125.0, 1.0), text=f"Primary Text: {body_len}/125 chars")
 
-        st.markdown(f"**Body Copy** (`{body_len}/125 chars`):")
-        st.write(active_eng_body)
-        st.progress(body_prog, text=f"Meta Primary Text Limit: {body_len}/125 characters" if body_len <= 125 else f"⚠️ Exceeds 125 chars ({body_len}/125)")
-
-        st.markdown(f"**Call to Action:** `{eng_cta}`")
-
-        # Social Media Ad Card Mockup Preview (English)
-        st.markdown("##### 📱 Live Meta Feed Ad Preview (English)")
-        
-        # Safe image rendering inside mockup
-        if st.session_state.get("creative_image_bytes"):
-            import base64
-            b64_img = base64.b64encode(st.session_state["creative_image_bytes"]).decode()
-            img_html = f'<img src="data:image/jpeg;base64,{b64_img}" class="ad-media-img" style="width:100%; border-radius:8px;" alt="Ad Creative"/>'
-        elif st.session_state.get("creative_image_url"):
-            img_html = f'<img src="{st.session_state["creative_image_url"]}" class="ad-media-img" style="width:100%; border-radius:8px;" alt="Ad Creative"/>'
-        else:
-            img_html = """
-            <div style="padding: 40px 0; text-align: center;">
-                <div style="font-size: 2.2rem;">🛍️</div>
-                <div style="font-size: 0.85rem; font-weight: 600; margin-top: 4px; color: #c7d2fe;">Featured Product Creative</div>
-            </div>
-            """
-
-        clean_eng_body = active_eng_body.replace('"', '&quot;')
-        clean_eng_head = active_eng_head.replace('"', '&quot;')
-        st.markdown(
-            f"""
-            <div class="ad-preview-box">
-                <div class="ad-header">
-                    <div class="ad-avatar">AM</div>
-                    <div>
-                        <div class="ad-brand-name">AdMitra Brand</div>
-                        <div class="ad-sponsored">Sponsored • 🌐</div>
+            # English Feed Mockup
+            st.markdown("##### 📱 Meta Feed Preview (English)")
+            st.markdown(
+                f"""
+                <div class="ad-preview-box">
+                    <div class="ad-header">
+                        <div class="ad-avatar">AM</div>
+                        <div>
+                            <div class="ad-brand-name">AdMitra Brand</div>
+                            <div class="ad-sponsored">Sponsored • 🌐</div>
+                        </div>
                     </div>
+                    <div class="ad-body">{active_eng_body}</div>
                 </div>
-                <div class="ad-body">{clean_eng_body}</div>
-                <div class="ad-media-placeholder">
-                    {img_html}
-                </div>
-                <div class="ad-headline-bar">
-                    <div class="ad-headline-text">{clean_eng_head}</div>
+                """,
+                unsafe_allow_html=True
+            )
+            if st.session_state.get("creative_image_bytes"):
+                st.image(st.session_state["creative_image_bytes"], use_container_width=True)
+            elif st.session_state.get("creative_image_url"):
+                st.image(st.session_state["creative_image_url"], use_container_width=True)
+            else:
+                st.markdown('<div class="ad-media-placeholder"><div style="font-size:2rem;">🛍️</div><div style="font-size:0.85rem;font-weight:600;">Featured Product Creative</div></div>', unsafe_allow_html=True)
+            
+            st.markdown(
+                f"""
+                <div class="ad-headline-bar" style="margin-top: 6px;">
+                    <div class="ad-headline-text">{active_eng_head}</div>
                     <div class="ad-cta-btn">{eng_cta}</div>
                 </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-    with col_si:
-        st.markdown("### 🇱🇰 Sinhala Copy Studio (සිංහල)")
-        
-        # Angle Selection
-        angle_options_si = [f"Angle {i+1}: {a.get('angle', 'සෘජු දීමනාව')}" for i, a in enumerate(sin_angles)] if sin_angles else ["Default Creative"]
-        selected_si_idx = 0
-        if sin_angles:
-            sel_si_angle = st.radio(
-                "මනෝවිද්‍යාත්මක අලෙවිකරණ කෝණය (Marketing Angle)",
-                options=range(len(angle_options_si)),
-                format_func=lambda x: angle_options_si[x],
-                key="radio_sin_angle",
-                horizontal=True
+                """,
+                unsafe_allow_html=True
             )
-            selected_si_idx = sel_si_angle
-            active_sin_head = sin_angles[selected_si_idx].get("headline", sinhala.get("headline", ""))
-            active_sin_body = sin_angles[selected_si_idx].get("body", sinhala.get("body", ""))
-        else:
-            active_sin_head = sinhala.get("headline", "N/A")
-            active_sin_body = sinhala.get("body", "N/A")
 
-        sin_cta = sinhala.get("call_to_action", "දැන්ම ගන්න")
+        with tab_copy_si:
+            angle_options_si = [f"Angle {i+1}: {a.get('angle', 'සෘජු දීමනාව')}" for i, a in enumerate(sin_angles)] if sin_angles else ["Default Creative"]
+            selected_si_idx = 0
+            if sin_angles:
+                sel_si_angle = st.radio(
+                    "සිංහල අලෙවිකරණ කෝණය",
+                    options=range(len(angle_options_si)),
+                    format_func=lambda x: angle_options_si[x],
+                    key="radio_sin_angle",
+                    horizontal=True
+                )
+                selected_si_idx = sel_si_angle
+                active_sin_head = sin_angles[selected_si_idx].get("headline", sinhala.get("headline", ""))
+                active_sin_body = sin_angles[selected_si_idx].get("body", sinhala.get("body", ""))
+            else:
+                active_sin_head = sinhala.get("headline", "N/A")
+                active_sin_body = sinhala.get("body", "N/A")
 
-        # Live Character Count Compliance
-        sin_head_len = len(active_sin_head)
-        sin_body_len = len(active_sin_body)
-        sin_head_prog = min(sin_head_len / 40.0, 1.0)
-        sin_body_prog = min(sin_body_len / 125.0, 1.0)
+            sin_cta = sinhala.get("call_to_action", "දැන්ම ගන්න")
 
-        st.markdown(f"**Headline** (`{sin_head_len}/40 chars`):")
-        st.info(active_sin_head)
-        st.progress(sin_head_prog, text=f"Meta Headline Limit: {sin_head_len}/40 characters" if sin_head_len <= 40 else f"⚠️ Exceeds 40 chars ({sin_head_len}/40)")
+            # Compliance Meters
+            sin_head_len = len(active_sin_head)
+            sin_body_len = len(active_sin_body)
+            st.markdown(f"**Headline** (`{sin_head_len}/40 chars`):")
+            st.info(active_sin_head)
+            st.progress(min(sin_head_len / 40.0, 1.0), text=f"Headline: {sin_head_len}/40 chars")
 
-        st.markdown(f"**Body Copy** (`{sin_body_len}/125 chars`):")
-        st.write(active_sin_body)
-        st.progress(sin_body_prog, text=f"Meta Primary Text Limit: {sin_body_len}/125 characters" if sin_body_len <= 125 else f"⚠️ Exceeds 125 chars ({sin_body_len}/125)")
+            st.markdown(f"**Body Copy** (`{sin_body_len}/125 chars`):")
+            st.write(active_sin_body)
+            st.progress(min(sin_body_len / 125.0, 1.0), text=f"Primary Text: {sin_body_len}/125 chars")
 
-        st.markdown(f"**Call to Action:** `{sin_cta}`")
-
-        # Social Media Ad Card Mockup Preview (Sinhala)
-        st.markdown("##### 📱 Live Meta Feed Ad Preview (Sinhala)")
-        clean_sin_body = active_sin_body.replace('"', '&quot;')
-        clean_sin_head = active_sin_head.replace('"', '&quot;')
-        st.markdown(
-            f"""
-            <div class="ad-preview-box">
-                <div class="ad-header">
-                    <div class="ad-avatar">AM</div>
-                    <div>
-                        <div class="ad-brand-name">AdMitra Brand</div>
-                        <div class="ad-sponsored">අනුග්‍රහය දක්වන ලදී • 🌐</div>
+            # Sinhala Feed Mockup
+            st.markdown("##### 📱 Meta Feed Preview (Sinhala)")
+            st.markdown(
+                f"""
+                <div class="ad-preview-box">
+                    <div class="ad-header">
+                        <div class="ad-avatar">AM</div>
+                        <div>
+                            <div class="ad-brand-name">AdMitra Brand</div>
+                            <div class="ad-sponsored">අනුග්‍රහය දක්වන ලදී • 🌐</div>
+                        </div>
                     </div>
+                    <div class="ad-body">{active_sin_body}</div>
                 </div>
-                <div class="ad-body">{clean_sin_body}</div>
-                <div class="ad-media-placeholder">
-                    {img_html}
-                </div>
-                <div class="ad-headline-bar">
-                    <div class="ad-headline-text">{clean_sin_head}</div>
+                """,
+                unsafe_allow_html=True
+            )
+            if st.session_state.get("creative_image_bytes"):
+                st.image(st.session_state["creative_image_bytes"], use_container_width=True)
+            elif st.session_state.get("creative_image_url"):
+                st.image(st.session_state["creative_image_url"], use_container_width=True)
+            else:
+                st.markdown('<div class="ad-media-placeholder"><div style="font-size:2rem;">🛍️</div><div style="font-size:0.85rem;font-weight:600;">නිෂ්පාදන රූපය</div></div>', unsafe_allow_html=True)
+            
+            st.markdown(
+                f"""
+                <div class="ad-headline-bar" style="margin-top: 6px;">
+                    <div class="ad-headline-text">{active_sin_head}</div>
                     <div class="ad-cta-btn">{sin_cta}</div>
                 </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+                """,
+                unsafe_allow_html=True
+            )
 
     # -----------------------------------------------------------------------
     # 3. Human-in-the-Loop (HITL) Approval & Facebook Photo Ad Launch Workflow
@@ -1632,7 +1622,6 @@ def _render_content_tab(data: dict[str, Any]) -> None:
             post_caption = f"✨ {active_sin_head}\n\n{active_sin_body}\n\n🔥 {active_eng_head}\n{active_eng_body}\n\n👉 {eng_cta} | {sin_cta}\n\n#AdMitra #SriLanka #Ecommerce"
             
             with st.spinner("Publishing photo post directly to your Facebook Page..."):
-                # Check if we have visual image data
                 img_to_post = st.session_state.get("creative_image_bytes") or st.session_state.get("creative_image_url")
                 if img_to_post:
                     ok, text = publish_page_photo(img_to_post, post_caption)
