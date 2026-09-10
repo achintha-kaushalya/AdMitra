@@ -1391,17 +1391,30 @@ def _render_content_tab(data: dict[str, Any]) -> None:
 
         if vis_mode == "✨ Text-to-Image":
             product_hint = st.session_state.get("last_product", "Smart Noise-Canceling Headphones")
-            default_prompt = f"{product_hint} on a minimalist modern studio table, dramatic cinematic lighting, clean backdrop, 8k commercial photography"
+            default_prompt = f"extreme close-up hero shot of {product_hint}, centered commercial product photography, dramatic softbox lighting, 8k commercial ad asset"
             t2i_prompt = st.text_area("AI Visual Prompt", value=default_prompt, height=80, key="t2i_prompt_input")
             
-            if st.button("🪄 Generate 8K Ad Visual", type="primary", use_container_width=True):
-                with st.spinner("Rendering 8K commercial ad creative with Flux AI..."):
+            # Allow toggling commercial poster overlay
+            overlay_toggle = st.checkbox("🎨 Apply Commercial Sinhala & English Ad Overlay (Badges + Typography)", value=True, key="chk_ad_overlay")
+
+            if st.button("🪄 Generate 8K Ad Poster", type="primary", use_container_width=True):
+                with st.spinner("Rendering 8K commercial ad creative & applying Sinhala typography overlays..."):
                     try:
-                        img_url, img_bytes = generate_ad_image(t2i_prompt)
+                        sin_head_val = sinhala.get("headline", "විශේෂ දීමනාව: 20% ක වට්ටමක්")
+                        eng_head_val = english.get("headline", "Special Offer: 20% OFF")
+                        offer_val = st.session_state.get("last_offer", "20% OFF")
+                        
+                        img_url, img_bytes = generate_ad_image(
+                            t2i_prompt,
+                            headline_sinhala=sin_head_val,
+                            headline_english=eng_head_val,
+                            badge_text=offer_val,
+                            apply_ad_compositing=overlay_toggle
+                        )
                         st.session_state["creative_image_url"] = img_url
                         st.session_state["creative_image_bytes"] = img_bytes
                         if img_bytes or img_url:
-                            st.session_state["last_vis_status"] = f"✅ Visual generated! (Size: {len(img_bytes) if img_bytes else 'URL streaming'})"
+                            st.session_state["last_vis_status"] = f"✅ High-Converting Ad Poster Generated! ({len(img_bytes) if img_bytes else 'URL'} bytes)"
                             st.session_state["last_vis_error"] = None
                         else:
                             st.session_state["last_vis_status"] = None
@@ -1426,6 +1439,17 @@ def _render_content_tab(data: dict[str, Any]) -> None:
                     try:
                         raw_bytes = uploaded_file.getvalue() if uploaded_file else None
                         refined_p, img_url, img_bytes = transform_product_image(prod_name, transform_inst)
+                        
+                        # Apply poster compositing on transformed image
+                        if img_bytes:
+                            from shared.llm_provider import compose_commercial_ad_poster
+                            img_bytes = compose_commercial_ad_poster(
+                                img_bytes,
+                                headline_sinhala=sinhala.get("headline", "විලාසිතා එකතුව"),
+                                headline_english=english.get("headline", "Fashion Collection"),
+                                badge_text="NEW ARRIVAL",
+                                cta_text="දැන්ම ඇනවුම් කරන්න / Shop Now"
+                            )
                         st.session_state["creative_image_url"] = img_url
                         st.session_state["creative_image_bytes"] = img_bytes
                         st.session_state["last_vis_status"] = f"👗 Placement rendered! Prompt: {refined_p}"
