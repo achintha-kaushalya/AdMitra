@@ -1402,7 +1402,6 @@ def _render_content_tab(data: dict[str, Any]) -> None:
                     st.session_state["creative_image_url"] = img_url
                     st.session_state["creative_image_bytes"] = img_bytes
                     st.success("🎨 Visual generated successfully!")
-                    st.rerun()
 
     elif vis_mode == "👗 Image-to-Image (Virtual Model & Studio Placement)":
         st.markdown(
@@ -1430,7 +1429,6 @@ def _render_content_tab(data: dict[str, Any]) -> None:
                     st.session_state["creative_image_url"] = img_url
                     st.session_state["creative_image_bytes"] = img_bytes
                     st.success(f"👗 Placement rendered! Prompt: *{refined_p}*")
-                    st.rerun()
 
     else:
         direct_file = st.file_uploader("Upload Final Finished Ad Poster (PNG/JPG)", type=["png", "jpg", "jpeg"], key="direct_upload_img")
