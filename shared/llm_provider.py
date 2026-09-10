@@ -276,17 +276,20 @@ def generate_ad_image(
     raw_prompt = prompt.strip()
     
     # 1. Product Category Matching for High-End Commercial Hero Shots
-    # Curated ultra-HD commercial studio product photography assets
     PRODUCT_STUDIO_ASSETS = {
-        "iphone": "https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=1024&q=85", # iPhone 15/16/17 Pro Titanium Studio
+        "laptop": "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=1024&q=85", # Modern Laptop Studio
+        "msi": "https://images.unsplash.com/photo-1603302576837-37561b2e2302?w=1024&q=85", # Gaming/High-End Laptop
+        "computer": "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=1024&q=85",
+        "macbook": "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=1024&q=85",
+        "iphone": "https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=1024&q=85", # iPhone Titanium Studio
         "phone": "https://images.unsplash.com/photo-1598327105666-5b89351aff97?w=1024&q=85",
         "headphone": "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=1024&q=85", # Headphones Studio
+        "headset": "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=1024&q=85",
         "dress": "https://images.unsplash.com/photo-1539109136881-3be0616acf4b?w=1024&q=85", # Fashion Dress Studio
         "shoe": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=1024&q=85", # Red Nike Sneaker Studio
         "sneaker": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=1024&q=85",
         "watch": "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=1024&q=85", # Luxury Watch Studio
         "perfume": "https://images.unsplash.com/photo-1541643600914-78b084683601?w=1024&q=85", # Luxury Perfume Studio
-        "laptop": "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=1024&q=85", # Apple MacBook Studio
         "camera": "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=1024&q=85", # Professional Camera Studio
         "bag": "https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=1024&q=85", # Leather Handbag Studio
     }
@@ -299,8 +302,7 @@ def generate_ad_image(
             matched_stock_url = asset_url
             break
 
-    # 2. Build photorealistic commercial prompt without anime/character trigger words
-    # Strip anime-inducing words like 'hero shot', 'character', 'woman', etc. if product photography is intended
+    # 2. Build photorealistic commercial prompt
     clean_subj = raw_prompt
     for redundant in ["extreme close-up hero shot of", "hero shot of", "close-up of", "Vibrant E-Commerce Promotional Poster"]:
         clean_subj = clean_subj.replace(redundant, "")
@@ -320,12 +322,30 @@ def generate_ad_image(
         f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&seed={img_seed}&nologo=true"
     ]
     
-    # If a high-end product match is found, prioritize real commercial studio photography
+    # Prioritize matched product photography asset, then try live AI generation
     candidate_urls = ([matched_stock_url] if matched_stock_url else []) + poll_urls
 
-    # Guarantee fallback if all external endpoints fail or timeout
+    for url in candidate_urls:
+        try:
+            with httpx.Client(timeout=10.0, follow_redirects=True) as client:
+                res = client.get(url)
+                if res.status_code == 200 and len(res.content) > 3000:
+                    raw_bytes = res.content
+                    final_url = url
+                    break
+        except Exception:
+            continue
+
+    # Guarantee fallback if all external endpoints fail
     if not raw_bytes:
-        default_stock = "https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=1024&q=85" if "phone" in lower_p or "iphone" in lower_p else "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=1024&q=85"
+        if matched_stock_url:
+            default_stock = matched_stock_url
+        elif "laptop" in lower_p or "msi" in lower_p:
+            default_stock = "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=1024&q=85"
+        elif "phone" in lower_p or "iphone" in lower_p:
+            default_stock = "https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=1024&q=85"
+        else:
+            default_stock = "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=1024&q=85"
         try:
             with httpx.Client(timeout=8.0, follow_redirects=True) as client:
                 res = client.get(default_stock)
