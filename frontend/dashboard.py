@@ -63,9 +63,9 @@ except ImportError:
 try:
     from shared.llm_provider import generate_ad_image, transform_product_image
 except ImportError:
-    def generate_ad_image(prompt: str, seed=None):
+    def generate_ad_image(prompt: str, *args, **kwargs):
         return None, None
-    def transform_product_image(product_name: str, user_transformation_prompt: str, image_base64_or_desc=None):
+    def transform_product_image(product_name: str, user_transformation_prompt: str, *args, **kwargs):
         return user_transformation_prompt, None, None
 
 try:
