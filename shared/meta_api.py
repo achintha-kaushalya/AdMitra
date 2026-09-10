@@ -197,11 +197,9 @@ def fetch_live_campaign_metrics() -> Optional[List[Dict[str, Any]]]:
         return None
 
     try:
-        url = f"{GRAPH_BASE_URL}/{act_id}/campaigns?fields=id,name,status,objective,insights.date_preset(maximum){{spend,impressions,cpm,ctr,actions,purchase_roas}}&limit=25&access_token={token}"
-        res = httpx.get(url, timeout=6.0)
+        url = f"{GRAPH_BASE_URL}/{act_id}/campaigns?fields=id,name,status,effective_status,objective,insights.date_preset(maximum){{spend,impressions,cpm,ctr,actions,purchase_roas}}&limit=25&access_token={token}"
+        res = httpx.get(url, timeout=8.0)
         if res.status_code != 200:
-            if "OAuthException" in res.text or res.status_code in (400, 401, 403):
-                _token_invalid_cache = True
             return None
 
         data = res.json().get("data", [])
@@ -217,10 +215,15 @@ def fetch_live_campaign_metrics() -> Optional[List[Dict[str, Any]]]:
             roas_list = insights.get("purchase_roas", [])
             roas = float(roas_list[0].get("value", 0.0) or 0.0) if roas_list else (2.5 if spend > 0 else 0.0)
 
+            # Determine real effective status
+            eff_status = str(camp.get("effective_status") or camp.get("status") or "PAUSED").upper()
+            status = "ACTIVE" if "ACTIVE" in eff_status else ("COMPLETED" if "COMPLETED" in eff_status else "PAUSED")
+
             # Synthesize realistic benchmark comparison
             metrics_list.append({
                 "name": camp.get("name"),
-                "status": camp.get("status"),
+                "status": status,
+                "effective_status": eff_status,
                 "current_CPM": round(cpm, 2),
                 "prev_CPM": round(cpm * 0.9, 2) if cpm > 0 else 1.2,
                 "current_CTR": round(ctr, 2),

@@ -895,7 +895,14 @@ def _render_performance_tab(data: dict[str, Any]) -> None:
         st.markdown("#### 📊 Comparative Campaign Metric Matrix")
         table_rows = []
         for m in metrics:
-            status_dot = "🟢 Active" if m.get("status") == "ACTIVE" else "⚪ Inactive"
+            st_raw = str(m.get("status", "PAUSED")).upper()
+            if "ACTIVE" in st_raw:
+                status_dot = "🟢 Active"
+            elif "COMPLETED" in st_raw:
+                status_dot = "🔵 Completed"
+            else:
+                status_dot = "⚪ Inactive / Paused"
+
             table_rows.append({
                 "Campaign Name": m.get("name", "N/A"),
                 "Status": status_dot,
