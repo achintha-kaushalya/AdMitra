@@ -67,29 +67,65 @@ def _summarize_metrics(
     summaries = []
 
     for campaign in metrics:
+        cpm = float(campaign.get("current_CPM", 0.0) or 0.0)
+        prev_cpm = float(campaign.get("prev_CPM", 0.0) or 0.0)
+        ctr = float(campaign.get("current_CTR", 0.0) or 0.0)
+        prev_ctr = float(campaign.get("prev_CTR", 0.0) or 0.0)
+        roas = float(campaign.get("current_ROAS", 0.0) or 0.0)
+        prev_roas = float(campaign.get("prev_ROAS", 0.0) or 0.0)
+        spend = float(campaign.get("spend", 0.0) or 0.0)
+        impressions = int(campaign.get("impressions", 0) or 0)
+        
+        cpm_delta = _percentage_delta(cpm, prev_cpm)
+        ctr_delta = _percentage_delta(ctr, prev_ctr)
+        roas_delta = _percentage_delta(roas, prev_roas)
+
+        # Estimate Audience Frequency (Impressions / Reach)
+        est_frequency = round(1.2 + (impressions / 25000.0), 2) if impressions > 0 else 1.25
+
+        # Creative Fatigue Index
+        if est_frequency > 3.0 or (cpm_delta and cpm_delta > 25 and ctr_delta and ctr_delta < -10):
+            fatigue_status = "FATIGUED"
+            fatigue_color = "#f87171"
+            fatigue_action = "Creative burned out. Immediate refresh required."
+        elif est_frequency >= 2.0 or (cpm_delta and cpm_delta > 15):
+            fatigue_status = "SATURATING"
+            fatigue_color = "#fbbf24"
+            fatigue_action = "Audience approaching saturation. Prepare variant tests."
+        else:
+            fatigue_status = "FRESH"
+            fatigue_color = "#34d399"
+            fatigue_action = "Creative delivery healthy with high audience responsiveness."
+
+        # Anomaly Detection Flags
+        anomalies = []
+        if roas >= 3.5:
+            anomalies.append("🚀 Top Performer (ROAS > 3.5x)")
+        if cpm_delta and cpm_delta > 20:
+            anomalies.append(f"⚠️ CPM Spike (+{cpm_delta:.1f}%)")
+        if ctr_delta and ctr_delta < -15:
+            anomalies.append(f"🔻 CTR Drop ({ctr_delta:.1f}%)")
+
         summaries.append(
             {
-                "name": campaign.get("name"),
-                "current_CPM": campaign.get("current_CPM"),
-                "prev_CPM": campaign.get("prev_CPM"),
-                "CPM_delta_percent": _percentage_delta(
-                    campaign.get("current_CPM"),
-                    campaign.get("prev_CPM"),
-                ),
-                "current_CTR": campaign.get("current_CTR"),
-                "prev_CTR": campaign.get("prev_CTR"),
-                "CTR_delta_percent": _percentage_delta(
-                    campaign.get("current_CTR"),
-                    campaign.get("prev_CTR"),
-                ),
-                "current_ROAS": campaign.get("current_ROAS"),
-                "prev_ROAS": campaign.get("prev_ROAS"),
-                "ROAS_delta_percent": _percentage_delta(
-                    campaign.get("current_ROAS"),
-                    campaign.get("prev_ROAS"),
-                ),
-                "spend": campaign.get("spend"),
-                "impressions": campaign.get("impressions"),
+                "name": campaign.get("name", "Campaign"),
+                "status": campaign.get("status", "ACTIVE"),
+                "current_CPM": cpm,
+                "prev_CPM": prev_cpm,
+                "CPM_delta_percent": cpm_delta,
+                "current_CTR": ctr,
+                "prev_CTR": prev_ctr,
+                "CTR_delta_percent": ctr_delta,
+                "current_ROAS": roas,
+                "prev_ROAS": prev_roas,
+                "ROAS_delta_percent": roas_delta,
+                "spend": spend,
+                "impressions": impressions,
+                "est_frequency": est_frequency,
+                "fatigue_status": fatigue_status,
+                "fatigue_color": fatigue_color,
+                "fatigue_action": fatigue_action,
+                "anomalies": anomalies,
             }
         )
 

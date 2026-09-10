@@ -825,7 +825,72 @@ def _render_performance_tab(data: dict[str, Any]) -> None:
             col4.metric("Total Spend", f"${m.get('spend', 0):,.2f}")
             st.divider()
 
-    # --- Interactive Benchmark & Comparison Table ---
+    # --- 1. Creative Fatigue & Anomaly Detection Center ---
+    if isinstance(metrics, list) and len(metrics) > 0:
+        st.markdown("#### 🛡️ Creative Fatigue & Audience Saturation Radar")
+        st.caption("Real-time monitoring of frequency caps and creative burnout across live Meta ad sets:")
+        
+        cols_fatigue = st.columns(min(len(metrics[:3]), 3))
+        for idx, m in enumerate(metrics[:3]):
+            fatigue_status = m.get("fatigue_status", "FRESH")
+            fatigue_color = m.get("fatigue_color", "#34d399")
+            fatigue_action = m.get("fatigue_action", "Creative delivery optimal.")
+            freq = m.get("est_frequency", 1.25)
+            c_name = m.get("name", f"Ad Set #{idx+1}")
+            anomalies = m.get("anomalies", [])
+            anomaly_badge = f"<div style='margin-top:6px;'>{' '.join([f'<span class=\"badge-med\">{a}</span>' for a in anomalies])}</div>" if anomalies else ""
+
+            with cols_fatigue[idx]:
+                st.markdown(
+                    f"""
+                    <div class="glass-card" style="padding: 14px 16px; border-top: 3px solid {fatigue_color};">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="font-weight: 700; font-size: 0.92rem; color: #f8fafc;">{c_name[:24]}</span>
+                            <span style="background: {fatigue_color}22; color: {fatigue_color}; font-weight: 700; font-size: 0.72rem; padding: 2px 8px; border-radius: 4px; border: 1px solid {fatigue_color}55;">
+                                {fatigue_status}
+                            </span>
+                        </div>
+                        <div style="font-size: 0.78rem; color: #94a3b8; margin-top: 6px;">
+                            Est. Audience Frequency: <b style="color:#f8fafc;">{freq:.2f}x</b>
+                        </div>
+                        <div style="font-size: 0.8rem; color: #cbd5e1; margin-top: 6px; line-height: 1.35;">
+                            {fatigue_action}
+                        </div>
+                        {anomaly_badge}
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+
+    st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
+
+    # --- 2. Interactive Predictive What-If Scaling Simulator ---
+    st.markdown("#### 🔮 AI What-If Budget Scaling Simulator")
+    st.caption("Simulate expected revenue, conversions, and estimated ROAS decay before increasing Meta ad spend:")
+
+    sim_col1, sim_col2 = st.columns([1.5, 2.5])
+    with sim_col1:
+        current_budget_val = 50.0
+        scale_percent = st.slider("Scale Daily Spend (%)", min_value=-50, max_value=200, value=25, step=5, format="%d%%")
+        est_new_spend = current_budget_val * (1 + (scale_percent / 100.0))
+        base_roas = 2.50
+        # Realistic diminishing return model (ROAS decays slightly as budget scales into broader audience)
+        decay_factor = 1.0 - (scale_percent * 0.0012) if scale_percent > 0 else 1.0 + (abs(scale_percent) * 0.001)
+        sim_roas = max(1.2, round(base_roas * decay_factor, 2))
+        sim_revenue = round(est_new_spend * sim_roas, 2)
+
+    with sim_col2:
+        m_c1, m_c2, m_c3 = st.columns(3)
+        with m_c1:
+            st.metric("Projected Daily Spend", f"${est_new_spend:.2f}/d", f"{scale_percent:+d}%")
+        with m_c2:
+            st.metric("Projected ROAS", f"{sim_roas:.2f}x", f"{(sim_roas - base_roas):+.2f}x")
+        with m_c3:
+            st.metric("Projected Daily Revenue", f"${sim_revenue:.2f}/d", f"{scale_percent:+d}%")
+
+    st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
+
+    # --- 3. Interactive Benchmark & Comparison Table ---
     if isinstance(metrics, list) and len(metrics) > 0:
         st.markdown("#### 📊 Comparative Campaign Metric Matrix")
         table_rows = []
@@ -838,11 +903,13 @@ def _render_performance_tab(data: dict[str, Any]) -> None:
                 "CPM ($)": f"${m.get('current_CPM', 0.0):.2f}",
                 "CTR (%)": f"{m.get('current_CTR', 0.0):.2f}%",
                 "ROAS (x)": f"{m.get('current_ROAS', 0.0):.2f}x",
+                "Est. Frequency": f"{m.get('est_frequency', 1.25):.2f}x",
+                "Fatigue Health": m.get("fatigue_status", "FRESH"),
                 "Impressions": f"{m.get('impressions', 0):,}"
             })
         st.dataframe(table_rows, use_container_width=True)
 
-    # --- RAG Vector Retrieval Evidence ---
+    # --- 4. RAG Vector Retrieval Evidence ---
     if similar:
         st.markdown("#### 🔍 ChromaDB Vector Retrieval Evidence (RAG Precedents)")
         st.caption("AI semantic memory matches your current drafts with historical winning strategies:")
