@@ -38,12 +38,14 @@ except ImportError:
     engagement_agent = None
 
 try:
-    from shared.meta_api import update_ad_set_status, update_ad_set_budget, publish_page_post, fetch_all_historical_campaigns
+    from shared.meta_api import update_ad_set_status, update_ad_set_budget, publish_page_post, fetch_all_historical_campaigns, fetch_live_ad_sets
 except ImportError:
     def update_ad_set_status(ad_set_id: str, new_status: str = "ACTIVE"):
         return False, "Shared Meta API module not accessible."
     def update_ad_set_budget(ad_set_id: str, new_daily_budget_usd: float):
         return False, "Shared Meta API module not accessible."
+    def fetch_live_ad_sets():
+        return []
     def publish_page_post(message: str):
         return False, "Shared Meta API module not accessible."
     def fetch_all_historical_campaigns(max_campaigns: int = 100):
@@ -1142,26 +1144,28 @@ def _render_budget_tab(data: dict[str, Any]) -> None:
     st.markdown("#### ⚡ Live Ad Set Budget Control Panel")
     st.caption("Directly adjust daily ad set budgets and push changes live to Meta Ads Manager:")
 
-    # Find live ad sets to manage
-    ad_sets_to_show = []
-    if issues:
-        for iss in issues:
-            set_id = iss.get("ad_set_id")
-            if set_id:
-                ad_sets_to_show.append({
-                    "id": set_id,
-                    "name": iss.get("ad_set_name") or f"Ad Set {set_id}",
-                    "current_budget": iss.get("daily_budget", 3.0),
-                    "status": iss.get("status", "PAUSED")
-                })
-
-    # Add active running campaign as top card
-    ad_sets_to_show.insert(0, {
-        "id": "120249959902480182",
-        "name": 'Post: "🔥 2026 O/L ලියන අයට" (Active Winner)',
-        "current_budget": 5.0,
-        "status": "ACTIVE"
-    })
+    # Find live ad sets to manage dynamically directly from Meta API
+    live_adsets_from_meta = fetch_live_ad_sets()
+    if live_adsets_from_meta:
+        ad_sets_to_show = live_adsets_from_meta
+    else:
+        ad_sets_to_show = []
+        if issues:
+            for iss in issues:
+                set_id = iss.get("ad_set_id")
+                if set_id:
+                    ad_sets_to_show.append({
+                        "id": set_id,
+                        "name": iss.get("ad_set_name") or f"Ad Set {set_id}",
+                        "daily_budget": iss.get("daily_budget", 3.0),
+                        "status": iss.get("status", "PAUSED")
+                    })
+        ad_sets_to_show.insert(0, {
+            "id": "120249959902480182",
+            "name": 'Post: "🔥 2026 O/L ලියන අයට" (Active Winner)',
+            "daily_budget": 5.0,
+            "status": "ACTIVE"
+        })
 
     # Render Budget Adjustment Cards
     for idx, aset in enumerate(ad_sets_to_show[:3]):

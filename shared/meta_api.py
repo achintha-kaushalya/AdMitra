@@ -379,3 +379,37 @@ def update_ad_set_budget(ad_set_id: str, new_daily_budget_usd: float) -> tuple[b
         return False, f"Budget update exception: {exc}"
 
 
+def fetch_live_ad_sets() -> list[dict[str, Any]]:
+    """
+    Fetches real live ad sets and their actual current daily_budget from Meta Graph API.
+    """
+    token, act_id = get_meta_credentials()
+    if not token or not act_id:
+        return []
+
+    try:
+        url = f"{GRAPH_BASE_URL}/{act_id}/adsets?fields=id,name,status,effective_status,daily_budget,campaign{{name}}&limit=15&access_token={token}"
+        with httpx.Client(timeout=10.0) as client:
+            res = client.get(url)
+        if res.status_code != 200:
+            return []
+
+        adsets = []
+        for a in res.json().get("data", []):
+            raw_budget = a.get("daily_budget")
+            budget_usd = float(raw_budget) / 100.0 if raw_budget else 3.0
+            eff = str(a.get("effective_status", "PAUSED")).upper()
+            status = "ACTIVE" if "ACTIVE" in eff else "PAUSED"
+            adsets.append({
+                "id": a.get("id"),
+                "name": a.get("name", "Ad Set"),
+                "status": status,
+                "effective_status": eff,
+                "daily_budget": budget_usd
+            })
+        return adsets
+    except Exception:
+        return []
+
+
+
