@@ -1231,28 +1231,87 @@ def _render_budget_tab(data: dict[str, Any]) -> None:
 
             with col_actions:
                 st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
-                if st.button("💾 Apply to Meta", key=f"btn_apply_{set_id}", use_container_width=True):
-                    with st.spinner(f"Pushing ${target_budget:.2f}/day to Meta Ads Manager..."):
-                        try:
-                            from shared.meta_api import update_ad_set_budget as _live_update_budget
-                            ok, msg = _live_update_budget(set_id, target_budget)
-                        except Exception as e:
-                            ok, msg = False, f"Meta API error: {e}"
+                col_btn_app, col_btn_link = st.columns([1.2, 0.8])
+                with col_btn_app:
+                    if st.button("💾 Apply", key=f"btn_apply_{set_id}", use_container_width=True):
+                        with st.spinner(f"Pushing ${target_budget:.2f}/day to Meta Ads Manager..."):
+                            try:
+                                from shared.meta_api import update_ad_set_budget as _live_update_budget
+                                ok, msg = _live_update_budget(set_id, target_budget)
+                            except Exception as e:
+                                ok, msg = False, f"Meta API error: {e}"
 
-                        if ok:
-                            # Record in session state to trigger cooldown state
-                            st.session_state["applied_budget_actions"][set_id] = {
-                                "new_budget": target_budget,
-                                "timestamp": datetime.now(timezone.utc).strftime("%H:%M:%S UTC")
-                            }
-                            st.success(f"✅ Adjusted to ${target_budget:.2f}/day!")
-                            st.rerun()
-                        else:
-                            st.warning(f"ℹ️ {msg}")
+                            if ok:
+                                # Record in session state to trigger cooldown state & history log
+                                if "budget_audit_log" not in st.session_state:
+                                    st.session_state["budget_audit_log"] = []
+                                st.session_state["budget_audit_log"].insert(0, {
+                                    "ad_set_name": set_name,
+                                    "old_budget": live_current_budget,
+                                    "new_budget": target_budget,
+                                    "time": datetime.now(timezone.utc).strftime("%H:%M:%S UTC")
+                                })
+                                st.session_state["applied_budget_actions"][set_id] = {
+                                    "new_budget": target_budget,
+                                    "timestamp": datetime.now(timezone.utc).strftime("%H:%M:%S UTC")
+                                }
+                                st.success(f"✅ Adjusted to ${target_budget:.2f}/day!")
+                                st.rerun()
+                            else:
+                                st.warning(f"ℹ️ {msg}")
+                with col_btn_link:
+                    meta_deeplink = f"https://adsmanager.facebook.com/adsmanager/manage/adsets?act=2988270838114228&selected_adset_ids={set_id}"
+                    st.link_button("🔗 Meta", meta_deeplink, use_container_width=True)
 
             st.divider()
 
-    # --- 3. Financial Guidance & RAG Historical Precedents ---
+    # --- 3. Autonomous Stop-Loss Guardrails & Audit Ledger ---
+    col_guard, col_ledger = st.columns([1.2, 1.3])
+    with col_guard:
+        st.markdown(
+            """
+            <div class="glass-card" style="padding: 16px 18px; height: 100%;">
+                <h4 style="margin-top:0; color:#f8fafc; font-size: 1.0rem;">🛡️ Autonomous Stop-Loss Guardrails</h4>
+                <div style="font-size:0.80rem; color:#cbd5e1; line-height:1.45;">
+                    Active automated rules protecting ad spend:
+                    <ul style="margin: 6px 0 0 0; padding-left: 16px;">
+                        <li><b>Max CPR Spike Cap:</b> Auto-alert if CPR exceeds <b>$1.20</b></li>
+                        <li><b>Frequency Burnout Pause:</b> Alert if 7-day frequency exceeds <b>3.0x</b></li>
+                        <li><b>Daily Loss Limit:</b> Auto-flag if spend exceeds $30 with 0 conversions</li>
+                    </ul>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    with col_ledger:
+        st.markdown(
+            """
+            <div class="glass-card" style="padding: 16px 18px; height: 100%;">
+                <h4 style="margin-top:0; color:#f8fafc; font-size: 1.0rem;">📋 Scaling Action Ledger (Audit Trail)</h4>
+            """,
+            unsafe_allow_html=True
+        )
+        audit_log = st.session_state.get("budget_audit_log", [])
+        if audit_log:
+            for entry in audit_log[:3]:
+                st.markdown(
+                    f"""
+                    <div style="font-size: 0.8rem; color: #cbd5e1; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                        🕒 <code>{entry['time']}</code> • <b>{entry['ad_set_name'][:20]}</b>: 
+                        <span style="color:#94a3b8;">${entry['old_budget']:.2f}</span> ➔ <span style="color:#34d399; font-weight:700;">${entry['new_budget']:.2f}/d</span>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+        else:
+            st.caption("No manual adjustments executed in current session yet. All ad sets operating at baseline.")
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
+
+    # --- 4. Financial Guidance & RAG Historical Precedents ---
     if recommendations:
         st.markdown("#### 🪙 Strategic Reallocation Guidelines")
         for rec in recommendations:
