@@ -1192,7 +1192,12 @@ def _render_budget_tab(data: dict[str, Any]) -> None:
             with col_b3:
                 if st.button("💾 Apply to Meta", key=f"apply_budget_btn_{set_id}_{idx}", use_container_width=True):
                     with st.spinner(f"Updating Ad Set {set_id} budget to ${new_budget:.2f} on Meta..."):
-                        ok, msg = update_ad_set_budget(set_id, new_budget)
+                        try:
+                            from shared.meta_api import update_ad_set_budget as _live_update_budget
+                            ok, msg = _live_update_budget(set_id, new_budget)
+                        except Exception as e:
+                            ok, msg = False, f"Live Meta API call exception: {e}"
+
                         if ok:
                             st.success(f"✅ {msg}")
                         else:
