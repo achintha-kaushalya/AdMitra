@@ -147,16 +147,17 @@ def _build_prompt(
     ]
 
     return (
-        "Analyze these digital marketing campaign metrics. "
-        "Explain the important CPM, CTR, and ROAS changes, "
-        "use the historical campaign lessons, and give practical "
-        "next steps. "
-        f"Respond in {language}. "
-        "Do not invent metrics.\n"
-        f"Current metrics and percentage deltas: "
-        f"{json.dumps(summary, ensure_ascii=True)}\n"
-        f"Retrieved historical lessons: "
-        f"{json.dumps(lessons, ensure_ascii=True)}"
+        f"You are a Senior Digital Marketing Director reviewing Facebook Ad Campaign metrics. "
+        f"Respond in {language}.\n\n"
+        "Provide your analysis in EXACTLY two structured parts:\n\n"
+        "### 🎯 Executive Snapshot\n"
+        "- 🚀 **Portfolio Health:** [1 concise sentence on overall ROAS and conversion stability]\n"
+        "- ⚠️ **Key Risk / Fatigue:** [1 concise sentence on CPM movement or creative fatigue]\n"
+        "- 💡 **Strategic Recommendation:** [1 clear, actionable next step to scale or cut spend]\n\n"
+        "### 🔍 Detailed Performance Analysis\n"
+        "[2-3 short bullet points with specific campaign names and percentage movements. Keep concise and avoid long essays.]\n\n"
+        f"Campaign Metrics: {json.dumps(summary, ensure_ascii=True)}\n"
+        f"Historical RAG Lessons: {json.dumps(lessons, ensure_ascii=True)}"
     )
 
 
