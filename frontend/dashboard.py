@@ -1442,7 +1442,33 @@ def _render_content_tab(data: dict[str, Any]) -> None:
     st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
 
     # -----------------------------------------------------------------------
-    # 2. Bilingual Copy & Live Mockups
+    # 2. Dedicated Visual Preview Card (if generated / uploaded)
+    # -----------------------------------------------------------------------
+    if st.session_state.get("creative_image_bytes") or st.session_state.get("creative_image_url"):
+        st.markdown(
+            """
+            <div class="glass-card" style="padding: 16px 20px; border-left: 4px solid #10b981; margin-bottom: 20px;">
+                <h4 style="margin-top:0; color:#34d399; font-size: 1.05rem;">🖼️ Generated Visual Ad Creative (8K Ready)</h4>
+                <div style="font-size:0.83rem; color:#cbd5e1;">Live visual rendered and synchronized across all feed ad preview mockups below.</div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+        img_col1, img_col2 = st.columns([1.5, 2])
+        with img_col1:
+            if st.session_state.get("creative_image_bytes"):
+                st.image(st.session_state["creative_image_bytes"], caption="AdMitra AI 1:1 Creative Visual", use_container_width=True)
+            elif st.session_state.get("creative_image_url"):
+                st.image(st.session_state["creative_image_url"], caption="AdMitra AI 1:1 Creative Visual", use_container_width=True)
+        with img_col2:
+            st.info("✅ **Visual Synchronized**: This creative is loaded into both English and Sinhala Meta Feed Mockups and will be uploaded to your Facebook Page upon approval.")
+            if st.button("🗑️ Clear / Reset Visual", key="btn_clear_visual"):
+                st.session_state["creative_image_url"] = None
+                st.session_state["creative_image_bytes"] = None
+                st.rerun()
+
+    # -----------------------------------------------------------------------
+    # 3. Bilingual Copy & Live Mockups
     # -----------------------------------------------------------------------
     col_en, col_si = st.columns(2)
 
@@ -1488,19 +1514,23 @@ def _render_content_tab(data: dict[str, Any]) -> None:
         # Social Media Ad Card Mockup Preview (English)
         st.markdown("##### 📱 Live Meta Feed Ad Preview (English)")
         
-        # Render dynamic visual inside mockup
-        if st.session_state.get("creative_image_url"):
-            img_html = f'<img src="{st.session_state["creative_image_url"]}" class="ad-media-img" alt="Ad Creative"/>'
-        elif st.session_state.get("creative_image_bytes"):
+        # Safe image rendering inside mockup
+        if st.session_state.get("creative_image_bytes"):
             import base64
             b64_img = base64.b64encode(st.session_state["creative_image_bytes"]).decode()
-            img_html = f'<img src="data:image/jpeg;base64,{b64_img}" class="ad-media-img" alt="Ad Creative"/>'
+            img_html = f'<img src="data:image/jpeg;base64,{b64_img}" class="ad-media-img" style="width:100%; border-radius:8px;" alt="Ad Creative"/>'
+        elif st.session_state.get("creative_image_url"):
+            img_html = f'<img src="{st.session_state["creative_image_url"]}" class="ad-media-img" style="width:100%; border-radius:8px;" alt="Ad Creative"/>'
         else:
             img_html = """
-            <div style="font-size: 2.2rem;">🛍️</div>
-            <div style="font-size: 0.85rem; font-weight: 600; margin-top: 4px;">Featured Product Creative</div>
+            <div style="padding: 40px 0; text-align: center;">
+                <div style="font-size: 2.2rem;">🛍️</div>
+                <div style="font-size: 0.85rem; font-weight: 600; margin-top: 4px; color: #c7d2fe;">Featured Product Creative</div>
+            </div>
             """
 
+        clean_eng_body = active_eng_body.replace('"', '&quot;')
+        clean_eng_head = active_eng_head.replace('"', '&quot;')
         st.markdown(
             f"""
             <div class="ad-preview-box">
@@ -1511,12 +1541,12 @@ def _render_content_tab(data: dict[str, Any]) -> None:
                         <div class="ad-sponsored">Sponsored • 🌐</div>
                     </div>
                 </div>
-                <div class="ad-body">{active_eng_body}</div>
+                <div class="ad-body">{clean_eng_body}</div>
                 <div class="ad-media-placeholder">
                     {img_html}
                 </div>
                 <div class="ad-headline-bar">
-                    <div class="ad-headline-text">{active_eng_head}</div>
+                    <div class="ad-headline-text">{clean_eng_head}</div>
                     <div class="ad-cta-btn">{eng_cta}</div>
                 </div>
             </div>
@@ -1565,6 +1595,8 @@ def _render_content_tab(data: dict[str, Any]) -> None:
 
         # Social Media Ad Card Mockup Preview (Sinhala)
         st.markdown("##### 📱 Live Meta Feed Ad Preview (Sinhala)")
+        clean_sin_body = active_sin_body.replace('"', '&quot;')
+        clean_sin_head = active_sin_head.replace('"', '&quot;')
         st.markdown(
             f"""
             <div class="ad-preview-box">
@@ -1575,12 +1607,12 @@ def _render_content_tab(data: dict[str, Any]) -> None:
                         <div class="ad-sponsored">අනුග්‍රහය දක්වන ලදී • 🌐</div>
                     </div>
                 </div>
-                <div class="ad-body">{active_sin_body}</div>
+                <div class="ad-body">{clean_sin_body}</div>
                 <div class="ad-media-placeholder">
                     {img_html}
                 </div>
                 <div class="ad-headline-bar">
-                    <div class="ad-headline-text">{active_sin_head}</div>
+                    <div class="ad-headline-text">{clean_sin_head}</div>
                     <div class="ad-cta-btn">{sin_cta}</div>
                 </div>
             </div>
