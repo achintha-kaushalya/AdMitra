@@ -160,13 +160,14 @@ def compose_commercial_ad_poster(
     headline_sinhala: str = "විශේෂ දීමනාව",
     headline_english: str = "Special Offer",
     badge_text: str = "20% OFF",
-    cta_text: str = "Shop Now / දැන්ම ගන්න"
+    cta_text: str = "දැන්ම ඇනවුම් කරන්න / Shop Now"
 ) -> bytes:
     """
     Composites a high-converting e-commerce commercial social media ad poster
-    with gradient overlays, Sinhala & English typography, discount badges, and CTA ribbon.
+    with clean gradient overlays, Sinhala & English typography, geometric discount badges, and CTA ribbon.
+    Zero missing-glyph boxes by avoiding raw unicode emoji glyphs in font drawing.
     """
-    from PIL import Image, ImageDraw, ImageFont, ImageFilter
+    from PIL import Image, ImageDraw, ImageFont
     import io
 
     try:
@@ -179,50 +180,65 @@ def compose_commercial_ad_poster(
         draw = ImageDraw.Draw(overlay)
 
         # 1. Top dark gradient for brand & badge
-        for y in range(220):
-            alpha = int(220 * (1.0 - (y / 220.0)))
+        for y in range(200):
+            alpha = int(220 * (1.0 - (y / 200.0)))
             draw.line([(0, y), (1024, y)], fill=(15, 23, 42, alpha))
 
         # 2. Bottom dark gradient for Sinhala & English copy
-        for y in range(700, 1024):
-            alpha = int(240 * ((y - 700) / 324.0))
+        for y in range(680, 1024):
+            alpha = int(245 * ((y - 680) / 344.0))
             draw.line([(0, y), (1024, y)], fill=(15, 23, 42, alpha))
 
-        # Fonts setup (Nirmala UI for Sinhala, Arial for English)
+        # Fonts setup (Nirmala UI for Sinhala, Arial Bold for English)
         font_dir = "C:/Windows/Fonts"
         try:
-            sin_font = ImageFont.truetype(f"{font_dir}/Nirmala.ttc", 36)
-            eng_font = ImageFont.truetype(f"{font_dir}/arialbd.ttf", 40)
-            badge_font = ImageFont.truetype(f"{font_dir}/arialbd.ttf", 32)
-            small_font = ImageFont.truetype(f"{font_dir}/arial.ttf", 22)
-            cta_font = ImageFont.truetype(f"{font_dir}/Nirmala.ttc", 26)
+            sin_font = ImageFont.truetype(f"{font_dir}/Nirmala.ttc", 38)
+            eng_font = ImageFont.truetype(f"{font_dir}/arialbd.ttf", 36)
+            badge_font = ImageFont.truetype(f"{font_dir}/arialbd.ttf", 30)
+            tag_font = ImageFont.truetype(f"{font_dir}/arialbd.ttf", 26)
+            cta_font = ImageFont.truetype(f"{font_dir}/Nirmala.ttc", 28)
+            cta_btn_font = ImageFont.truetype(f"{font_dir}/arialbd.ttf", 26)
         except Exception:
             sin_font = ImageFont.load_default()
             eng_font = ImageFont.load_default()
             badge_font = ImageFont.load_default()
-            small_font = ImageFont.load_default()
+            tag_font = ImageFont.load_default()
             cta_font = ImageFont.load_default()
+            cta_btn_font = ImageFont.load_default()
 
-        # Top Discount / Promo Badge (Top Right)
-        badge_w, badge_h = 240, 60
+        # Clean string inputs (remove any emoji characters that could cause box glyphs)
+        clean_sin_head = headline_sinhala.replace("✨", "").replace("🔥", "").replace("👉", "").strip()
+        clean_eng_head = headline_english.replace("✨", "").replace("🔥", "").replace("👉", "").strip()
+        clean_badge = badge_text.replace("🔥", "").replace("✨", "").strip()
+        clean_cta = cta_text.replace("👉", "").replace("✨", "").strip()
+
+        # Top Right Discount / Promo Badge (Red pill badge with white border)
+        badge_w, badge_h = 240, 58
         bx0, by0 = 1024 - badge_w - 40, 40
-        draw.rounded_rectangle([(bx0, by0), (bx0 + badge_w, by0 + badge_h)], radius=12, fill=(239, 68, 68, 240), outline=(255, 255, 255, 200), width=2)
-        draw.text((bx0 + 24, by0 + 12), f"🔥 {badge_text}", fill=(255, 255, 255, 255), font=badge_font)
+        draw.rounded_rectangle([(bx0, by0), (bx0 + badge_w, by0 + badge_h)], radius=29, fill=(239, 68, 68, 245), outline=(255, 255, 255, 220), width=2)
+        # Draw decorative fire dot
+        draw.ellipse([(bx0 + 20, by0 + 20), (bx0 + 36, by0 + 36)], fill=(254, 240, 138, 255))
+        draw.text((bx0 + 48, by0 + 12), clean_badge, fill=(255, 255, 255, 255), font=badge_font)
 
-        # Top Left Brand Tag
-        draw.rounded_rectangle([(40, 40), (220, 95)], radius=10, fill=(30, 41, 59, 210), outline=(99, 102, 241, 200), width=2)
-        draw.text((60, 52), "⚡ AdMitra", fill=(255, 255, 255, 255), font=badge_font)
+        # Top Left Brand Tag (Indigo glass pill)
+        draw.rounded_rectangle([(40, 40), (220, 95)], radius=12, fill=(30, 41, 59, 230), outline=(99, 102, 241, 220), width=2)
+        # Decorative brand icon circle
+        draw.ellipse([(55, 55), (75, 75)], fill=(99, 102, 241, 255))
+        draw.text((88, 52), "AdMitra", fill=(255, 255, 255, 255), font=tag_font)
 
         # Bottom Typography Banner: Sinhala + English
-        # Sinhala Headline (Prominent)
-        draw.text((50, 750), f"✨ {headline_sinhala[:45]}", fill=(254, 240, 138, 255), font=sin_font)
-        # English Sub-headline
-        draw.text((50, 810), f"{headline_english[:50]}", fill=(248, 250, 252, 255), font=eng_font)
+        # Sinhala Headline (Prominent Gold/Yellow)
+        draw.text((50, 740), clean_sin_head[:50], fill=(254, 240, 138, 255), font=sin_font)
+        # English Sub-headline (Crisp White)
+        draw.text((50, 805), clean_eng_head[:55], fill=(248, 250, 252, 255), font=eng_font)
 
         # Bottom Action Bar / CTA Ribbon
-        draw.rounded_rectangle([(50, 890), (974, 970)], radius=14, fill=(99, 102, 241, 245), outline=(165, 180, 252, 220), width=2)
-        draw.text((80, 915), f"👉 {cta_text}", fill=(255, 255, 255, 255), font=cta_font)
-        draw.text((780, 918), "ORDER NOW ➔", fill=(254, 240, 138, 255), font=badge_font)
+        draw.rounded_rectangle([(50, 885), (974, 965)], radius=16, fill=(99, 102, 241, 245), outline=(165, 180, 252, 220), width=2)
+        draw.text((80, 908), clean_cta, fill=(255, 255, 255, 255), font=cta_font)
+        
+        # Inner CTA Button (Shop Now)
+        draw.rounded_rectangle([(740, 897), (955, 953)], radius=12, fill=(248, 250, 252, 255))
+        draw.text((765, 912), "ORDER NOW", fill=(67, 56, 202, 255), font=cta_btn_font)
 
         # Merge layers
         final_img = Image.alpha_composite(img, overlay).convert("RGB")
@@ -244,31 +260,65 @@ def generate_ad_image(
 ) -> tuple[Optional[str], Optional[bytes]]:
     """
     Generates high-resolution commercial ad imagery with professional marketing overlays:
-    1. AI Hero Product Shot (Centered, sharp commercial photography)
-    2. Sinhala & English Typography & Discount Badge Compositing
+    1. Realistic Product Hero Shot (Centered, sharp commercial studio photography)
+    2. High-converting Sinhala & English Typography & Discount Badge Compositing
     """
     import urllib.parse
     import random
     
-    clean_prompt = prompt.strip()
+    raw_prompt = prompt.strip()
     
-    # Force high-converting commercial photography prompt
-    enhanced_hero_prompt = f"professional commercial product photography of {clean_prompt}, centered close-up hero shot, studio softbox lighting, clean modern depth of field, high contrast, 8k commercial ad asset"
-    encoded_prompt = urllib.parse.quote(enhanced_hero_prompt)
+    # 1. Product Category Matching for High-End Commercial Hero Shots
+    # Curated ultra-HD commercial studio product photography assets
+    PRODUCT_STUDIO_ASSETS = {
+        "iphone": "https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=1024&q=85", # iPhone 15/16/17 Pro Titanium Studio
+        "phone": "https://images.unsplash.com/photo-1598327105666-5b89351aff97?w=1024&q=85",
+        "headphone": "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=1024&q=85", # Headphones Studio
+        "dress": "https://images.unsplash.com/photo-1539109136881-3be0616acf4b?w=1024&q=85", # Fashion Dress Studio
+        "shoe": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=1024&q=85", # Red Nike Sneaker Studio
+        "sneaker": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=1024&q=85",
+        "watch": "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=1024&q=85", # Luxury Watch Studio
+        "perfume": "https://images.unsplash.com/photo-1541643600914-78b084683601?w=1024&q=85", # Luxury Perfume Studio
+        "laptop": "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=1024&q=85", # Apple MacBook Studio
+        "camera": "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=1024&q=85", # Professional Camera Studio
+        "bag": "https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=1024&q=85", # Leather Handbag Studio
+    }
+    
+    # Check if prompt targets known product categories
+    matched_stock_url = None
+    lower_p = raw_prompt.lower()
+    for cat_key, asset_url in PRODUCT_STUDIO_ASSETS.items():
+        if cat_key in lower_p:
+            matched_stock_url = asset_url
+            break
+
+    # 2. Build photorealistic commercial prompt without anime/character trigger words
+    # Strip anime-inducing words like 'hero shot', 'character', 'woman', etc. if product photography is intended
+    clean_subj = raw_prompt
+    for redundant in ["extreme close-up hero shot of", "hero shot of", "close-up of", "Vibrant E-Commerce Promotional Poster"]:
+        clean_subj = clean_subj.replace(redundant, "")
+    clean_subj = clean_subj.strip(" ,")
+
+    realistic_product_prompt = f"commercial product photography of {clean_subj}, centered isolated product on modern studio pedestal, soft studio lighting, sharp focus, 8k commercial ad asset, no people, no face"
+    encoded_prompt = urllib.parse.quote(realistic_product_prompt)
     img_seed = seed or random.randint(10000, 999999)
-    
-    # 1. Try Pollinations AI (Flux / Turbo)
-    poll_urls = [
-        f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=768&height=768&seed={img_seed}&nologo=true&model=turbo",
-        f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=768&height=768&seed={img_seed}&nologo=true&model=flux",
-        f"https://image.pollinations.ai/prompt/{urllib.parse.quote(clean_prompt)}?width=768&height=768&seed={img_seed}&nologo=true"
-    ]
-    
+
+    # 3. Multi-tier Image Fetching Pipeline
     raw_bytes = None
     final_url = None
-    for url in poll_urls:
+
+    # Try realistic AI generation via Flux first
+    poll_urls = [
+        f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&seed={img_seed}&nologo=true&model=flux",
+        f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&seed={img_seed}&nologo=true"
+    ]
+    
+    # If a high-end product match is found, prioritize real commercial studio photography
+    candidate_urls = ([matched_stock_url] if matched_stock_url else []) + poll_urls
+
+    for url in candidate_urls:
         try:
-            with httpx.Client(timeout=12.0, follow_redirects=True) as client:
+            with httpx.Client(timeout=10.0, follow_redirects=True) as client:
                 res = client.get(url)
                 if res.status_code == 200 and len(res.content) > 3000:
                     raw_bytes = res.content
@@ -277,24 +327,7 @@ def generate_ad_image(
         except Exception:
             continue
 
-    # 2. Resilient High-Quality Commercial Product Visual Fallback (Unsplash 800x800)
-    if not raw_bytes:
-        kw = "headphones"
-        for term in ["headphone", "headphones", "dress", "fashion", "shoes", "sneakers", "watch", "perfume", "camera", "phone", "bag", "laptop"]:
-            if term in clean_prompt.lower():
-                kw = term
-                break
-        stock_url = f"https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=1024&auto=format&fit=crop&q=85" if "headphone" in kw else f"https://source.unsplash.com/featured/1024x1024/?{kw},product"
-        try:
-            with httpx.Client(timeout=10.0, follow_redirects=True) as client:
-                res = client.get(stock_url)
-                if res.status_code == 200 and len(res.content) > 2000:
-                    raw_bytes = res.content
-                    final_url = stock_url
-        except Exception:
-            pass
-
-    # 3. Apply Commercial Sinhala & English Ad Compositing Overlay
+    # 4. Apply Commercial Sinhala & English Ad Compositing Overlay
     if raw_bytes and apply_ad_compositing:
         composed_bytes = compose_commercial_ad_poster(
             raw_bytes,
@@ -307,8 +340,8 @@ def generate_ad_image(
     elif raw_bytes:
         return final_url, raw_bytes
 
-    # Ultimate fallback
-    fallback_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=768&height=768&seed={img_seed}&nologo=true"
+    # Fallback
+    fallback_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&seed={img_seed}&nologo=true"
     return fallback_url, None
 
 
