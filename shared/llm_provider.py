@@ -166,17 +166,25 @@ def generate_ad_image(prompt: str, seed: Optional[int] = None) -> tuple[Optional
     clean_prompt = prompt.strip()
     encoded_prompt = urllib.parse.quote(clean_prompt)
     img_seed = seed or random.randint(10000, 999999)
-    image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&seed={img_seed}&nologo=true&enhance=true&model=flux"
     
-    try:
-        with httpx.Client(timeout=25.0, follow_redirects=True) as client:
-            res = client.get(image_url)
-            if res.status_code == 200 and len(res.content) > 5000:
-                return image_url, res.content
-    except Exception as exc:
-        logger.info(f"Image generation download error: {exc}")
-        
-    return image_url, None
+    # Try ultra-fast generation endpoints
+    models_to_try = ["flux", "turbo", "flux-realism"]
+    
+    for model in models_to_try:
+        image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=768&height=768&seed={img_seed}&nologo=true&model={model}"
+        try:
+            with httpx.Client(timeout=12.0, follow_redirects=True) as client:
+                res = client.get(image_url)
+                if res.status_code == 200 and len(res.content) > 3000:
+                    return image_url, res.content
+        except Exception as exc:
+            logger.info(f"Image generation model {model} timeout/error: {exc}")
+            continue
+            
+    # If download timed out, return direct high-res URL for client browser rendering
+    fallback_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=768&height=768&seed={img_seed}&nologo=true&model=flux"
+    return fallback_url, None
+
 
 
 def transform_product_image(

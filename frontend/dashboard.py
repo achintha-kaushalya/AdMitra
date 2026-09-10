@@ -1436,15 +1436,13 @@ def _render_content_tab(data: dict[str, Any]) -> None:
         # Live Static Image Preview Panel (Left Side Dedicated Panel)
         st.markdown("<br>", unsafe_allow_html=True)
         st.markdown("##### 🖼️ Visual Creative Preview Screen")
-        if st.session_state.get("creative_image_bytes"):
-            st.image(st.session_state["creative_image_bytes"], caption="AdMitra AI 1:1 Creative Visual (Ready to Publish)", use_container_width=True)
-            if st.button("🗑️ Reset / Clear Visual", use_container_width=True):
-                st.session_state["creative_image_bytes"] = None
-                st.session_state["creative_image_url"] = None
-                st.session_state["last_vis_status"] = None
-                st.rerun()
-        elif st.session_state.get("creative_image_url"):
-            st.image(st.session_state["creative_image_url"], caption="AdMitra AI 1:1 Creative Visual (Ready to Publish)", use_container_width=True)
+        
+        has_bytes = bool(st.session_state.get("creative_image_bytes"))
+        has_url = bool(st.session_state.get("creative_image_url"))
+
+        if has_bytes or has_url:
+            img_target = st.session_state["creative_image_bytes"] if has_bytes else st.session_state["creative_image_url"]
+            st.image(img_target, caption="AdMitra AI 1:1 Creative Visual (Ready to Publish)", use_container_width=True)
             if st.button("🗑️ Reset / Clear Visual", use_container_width=True):
                 st.session_state["creative_image_bytes"] = None
                 st.session_state["creative_image_url"] = None
