@@ -1094,16 +1094,16 @@ def _render_budget_tab(data: dict[str, Any]) -> None:
         st.markdown(
             """
             <div class="glass-card" style="padding: 16px 18px; height: 100%;">
-                <h4 style="margin-top:0; color:#f8fafc; font-size: 1.05rem;">📊 Optimal Budget Split</h4>
-                <p style="font-size:0.82rem; color:#94a3b8; margin-bottom: 12px;">Recommended multi-stage capital allocation:</p>
+                <h4 style="margin-top:0; color:#f8fafc; font-size: 1.05rem;">📊 Optimal Target Budget Allocation</h4>
+                <p style="font-size:0.82rem; color:#94a3b8; margin-bottom: 12px;">Recommended multi-stage portfolio split:</p>
             """,
             unsafe_allow_html=True
         )
-        st.caption("🎯 High-Converting Bottom-Funnel / Messaging (60%)")
+        st.caption("🎯 High-ROAS Direct Response & Messaging (60%)")
         st.progress(0.60)
-        st.caption("🔄 Mid-Funnel Video Retargeting (25%)")
+        st.caption("🔄 Video Engagement & Retargeting (25%)")
         st.progress(0.25)
-        st.caption("🌐 Top-of-Funnel Broad Discovery (15%)")
+        st.caption("🌐 Top-of-Funnel Brand Awareness (15%)")
         st.progress(0.15)
         st.markdown("</div>", unsafe_allow_html=True)
 
@@ -1111,25 +1111,25 @@ def _render_budget_tab(data: dict[str, Any]) -> None:
         st.markdown(
             """
             <div class="glass-card" style="padding: 16px 18px; height: 100%;">
-                <h4 style="margin-top:0; color:#f8fafc; font-size: 1.05rem;">⚡ AI Capital Shift Directives</h4>
+                <h4 style="margin-top:0; color:#f8fafc; font-size: 1.05rem;">⚡ AI Capital Shift Strategy</h4>
             """,
             unsafe_allow_html=True
         )
         # Dynamic capital shift items
         shifts = [
-            ("Scale High-ROAS Winner", 'Post: "🔥 2026 O/L ලියන අයට"', "+$5.00/d", "#34d399", "CPR is low at $0.346. Scale budget to capture unsatisfied demand."),
-            ("Cap Broad Audience Drain", 'Post: "2027 A/L දරුවන්ගේ"', "-$2.00/d", "#fbbf24", "High frequency saturation. Conserve spend for refreshed creative."),
-            ("Retargeting Pool Reserve", 'Messenger Custom Audience', "+$3.00/d", "#818cf8", "Shift liberated capital to re-engage past 7-day conversation starters.")
+            ("Scale High-ROAS Winner", 'Post: "🔥 2026 O/L ලියන අයට"', "+20% / +$5.00", "#34d399", "CPR is low at $0.346. Scale budget gradually to protect conversion rate."),
+            ("Conserve Fatigued Spend", 'Post: "2027 A/L දරුවන්ගේ"', "-15% / -$3.00", "#fbbf24", "High frequency saturation detected. Shift budget to fresh creatives."),
+            ("Audience Retargeting Reserve", 'Messenger Custom Audience', "+$5.00/d", "#818cf8", "Reallocate freed capital into re-engaging active conversation starters.")
         ]
         for title, target, delta_amt, color, note in shifts:
             st.markdown(
                 f"""
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.06);">
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,0.06);">
                     <div>
                         <div style="font-weight: 600; font-size: 0.88rem; color: #f8fafc;">{title}</div>
                         <div style="font-size: 0.78rem; color: #94a3b8;">{target} • <span style="color:{color};">{note}</span></div>
                     </div>
-                    <div style="background: {color}22; color: {color}; font-weight: 700; font-size: 0.85rem; padding: 3px 10px; border-radius: 6px; border: 1px solid {color}44;">
+                    <div style="background: {color}22; color: {color}; font-weight: 700; font-size: 0.82rem; padding: 3px 10px; border-radius: 6px; border: 1px solid {color}44; white-space: nowrap;">
                         {delta_amt}
                     </div>
                 </div>
@@ -1140,9 +1140,9 @@ def _render_budget_tab(data: dict[str, Any]) -> None:
 
     st.markdown("<div style='height: 16px;'></div>", unsafe_allow_html=True)
 
-    # --- 2. Live Meta Ad Set Budget Controller (1-Click Apply) ---
-    st.markdown("#### ⚡ Live Ad Set Budget Control Panel")
-    st.caption("Directly adjust daily ad set budgets and push changes live to Meta Ads Manager:")
+    # --- 2. Live Meta Ad Set Budget Controller (Enterprise Rule Engine) ---
+    st.markdown("#### ⚡ Live Meta Ad Set Budget Controller")
+    st.caption("Adjust daily ad set budgets with AI recommended scaling increments (+20%, +$5, or custom) and sync directly to Meta:")
 
     # Find live ad sets to manage dynamically directly from Meta API
     live_adsets_from_meta = fetch_live_ad_sets()
@@ -1163,45 +1163,67 @@ def _render_budget_tab(data: dict[str, Any]) -> None:
         ad_sets_to_show.insert(0, {
             "id": "120249959902480182",
             "name": 'Post: "🔥 2026 O/L ලියන අයට" (Active Winner)',
-            "daily_budget": 5.0,
+            "daily_budget": 15.0,
             "status": "ACTIVE"
         })
 
-    # Render Budget Adjustment Cards
+    # Render Enterprise Budget Adjustment Cards
     for idx, aset in enumerate(ad_sets_to_show[:3]):
-        set_id = aset.get("id", f"set_{idx}")
+        set_id = str(aset.get("id", f"set_{idx}"))
         set_name = aset.get("name", "Ad Set")
-        curr_b = float(aset.get("daily_budget") or aset.get("current_budget") or 3.0)
+        live_current_budget = float(aset.get("daily_budget") or 3.0)
         st_val = str(aset.get("status", "PAUSED")).upper()
+        badge_st = "🟢 LIVE & ACTIVE" if st_val == "ACTIVE" else "⚪ PAUSED"
 
         with st.container():
-            col_b1, col_b2, col_b3 = st.columns([2.2, 1.3, 1.0])
-            with col_b1:
-                badge_st = "🟢 ACTIVE" if st_val == "ACTIVE" else "⚪ PAUSED"
-                st.markdown(f"**{set_name}** (`{set_id}`) • <span style='font-size:0.8rem; color:#a5b4fc;'>{badge_st}</span>", unsafe_allow_html=True)
-            with col_b2:
-                new_budget = st.number_input(
-                    f"Daily Budget (USD)",
+            col_info, col_controls, col_actions = st.columns([1.8, 1.4, 0.8])
+            
+            with col_info:
+                st.markdown(
+                    f"""
+                    <div style="padding: 4px 0;">
+                        <div style="font-weight: 700; color: #f8fafc; font-size: 0.95rem;">{set_name}</div>
+                        <div style="font-size: 0.78rem; color: #94a3b8; margin-top: 2px;">
+                            ID: <code style="color:#a5b4fc;">{set_id}</code> • <b>{badge_st}</b>
+                        </div>
+                        <div style="font-size: 0.85rem; color: #34d399; margin-top: 4px; font-weight: 600;">
+                            Live Meta Budget: ${live_current_budget:.2f}/day
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+
+            with col_controls:
+                # Provide enterprise Quick Preset suggestions (+20% scaling rule or custom)
+                rec_scaled_20 = round(live_current_budget * 1.20, 2)
+                rec_scaled_plus5 = round(live_current_budget + 5.0, 2)
+                
+                target_budget = st.number_input(
+                    f"New Daily Budget ($USD/day)",
                     min_value=1.0,
                     max_value=500.0,
-                    value=curr_b,
+                    value=live_current_budget,
                     step=1.0,
-                    key=f"budget_input_{set_id}_{idx}",
-                    label_visibility="collapsed"
+                    key=f"budget_ctrl_{set_id}",
+                    help=f"Enterprise 20% Safe Scaling Target: ${rec_scaled_20:.2f}/day"
                 )
-            with col_b3:
-                if st.button("💾 Apply to Meta", key=f"apply_budget_btn_{set_id}_{idx}", use_container_width=True):
-                    with st.spinner(f"Updating Ad Set {set_id} budget to ${new_budget:.2f} on Meta..."):
+
+            with col_actions:
+                st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
+                if st.button("💾 Apply to Meta", key=f"btn_apply_{set_id}", use_container_width=True):
+                    with st.spinner(f"Pushing ${target_budget:.2f}/day to Meta Ads Manager..."):
                         try:
                             from shared.meta_api import update_ad_set_budget as _live_update_budget
-                            ok, msg = _live_update_budget(set_id, new_budget)
+                            ok, msg = _live_update_budget(set_id, target_budget)
                         except Exception as e:
-                            ok, msg = False, f"Live Meta API call exception: {e}"
+                            ok, msg = False, f"Meta API error: {e}"
 
                         if ok:
-                            st.success(f"✅ {msg}")
+                            st.success(f"✅ Adjusted to ${target_budget:.2f}/day!")
                         else:
                             st.warning(f"ℹ️ {msg}")
+
             st.divider()
 
     # --- 3. Financial Guidance & RAG Historical Precedents ---
