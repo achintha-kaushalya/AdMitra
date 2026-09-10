@@ -370,10 +370,12 @@ def update_ad_set_budget(ad_set_id: str, new_daily_budget_usd: float) -> tuple[b
             "daily_budget": cents,
             "access_token": token
         }
-        res = httpx.post(url, data=payload, timeout=8.0)
+        with httpx.Client(timeout=15.0) as client:
+            res = client.post(url, data=payload)
         if res.status_code == 200 and res.json().get("success") is True:
             return True, f"Successfully adjusted daily budget to ${new_daily_budget_usd:.2f}/day on Meta!"
         return False, f"Meta API error: {res.text}"
     except Exception as exc:
         return False, f"Budget update exception: {exc}"
+
 
