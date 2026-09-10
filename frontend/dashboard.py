@@ -1088,6 +1088,38 @@ def _render_budget_tab(data: dict[str, Any]) -> None:
         unsafe_allow_html=True
     )
 
+    # Session state to track applied budget changes
+    if "applied_budget_actions" not in st.session_state:
+        st.session_state["applied_budget_actions"] = {}
+
+    # Find live ad sets to manage dynamically directly from Meta API
+    live_adsets_from_meta = fetch_live_ad_sets()
+    if live_adsets_from_meta:
+        ad_sets_to_show = live_adsets_from_meta
+    else:
+        ad_sets_to_show = []
+        if issues:
+            for iss in issues:
+                set_id = iss.get("ad_set_id")
+                if set_id:
+                    ad_sets_to_show.append({
+                        "id": set_id,
+                        "name": iss.get("ad_set_name") or f"Ad Set {set_id}",
+                        "daily_budget": iss.get("daily_budget", 3.0),
+                        "status": iss.get("status", "PAUSED")
+                    })
+        ad_sets_to_show.insert(0, {
+            "id": "120249959902480182",
+            "name": 'Post: "🔥 2026 O/L ලියන අයට" (Active Winner)',
+            "daily_budget": 18.0,
+            "status": "ACTIVE"
+        })
+
+    # Determine active campaign live budget
+    active_adset = next((a for a in ad_sets_to_show if a.get("id") == "120249959902480182"), ad_sets_to_show[0] if ad_sets_to_show else {})
+    active_live_b = float(active_adset.get("daily_budget", 18.0))
+    has_been_scaled = "120249959902480182" in st.session_state["applied_budget_actions"] or active_live_b >= 18.0
+
     # --- 1. Portfolio Budget Distribution & AI Target Split ---
     col_viz1, col_viz2 = st.columns([1.1, 1.4])
     with col_viz1:
@@ -1115,9 +1147,18 @@ def _render_budget_tab(data: dict[str, Any]) -> None:
             """,
             unsafe_allow_html=True
         )
-        # Dynamic capital shift items
+        # Dynamic capital shift items reflecting executed / cooldown status
+        if has_been_scaled:
+            winner_badge = "✅ EXECUTED ($18.00/d)"
+            winner_color = "#38bdf8"
+            winner_note = "Budget scaled successfully. <b>In 24-hour algorithmic learning cooldown</b> (do not scale further today)."
+        else:
+            winner_badge = "+20% / +$3.00"
+            winner_color = "#34d399"
+            winner_note = "CPR is low at $0.346. Scale budget gradually to protect conversion rate."
+
         shifts = [
-            ("Scale High-ROAS Winner", 'Post: "🔥 2026 O/L ලියන අයට"', "+20% / +$5.00", "#34d399", "CPR is low at $0.346. Scale budget gradually to protect conversion rate."),
+            ("Scale High-ROAS Winner", 'Post: "🔥 2026 O/L ලියන අයට"', winner_badge, winner_color, winner_note),
             ("Conserve Fatigued Spend", 'Post: "2027 A/L දරුවන්ගේ"', "-15% / -$3.00", "#fbbf24", "High frequency saturation detected. Shift budget to fresh creatives."),
             ("Audience Retargeting Reserve", 'Messenger Custom Audience', "+$5.00/d", "#818cf8", "Reallocate freed capital into re-engaging active conversation starters.")
         ]
@@ -1129,7 +1170,7 @@ def _render_budget_tab(data: dict[str, Any]) -> None:
                         <div style="font-weight: 600; font-size: 0.88rem; color: #f8fafc;">{title}</div>
                         <div style="font-size: 0.78rem; color: #94a3b8;">{target} • <span style="color:{color};">{note}</span></div>
                     </div>
-                    <div style="background: {color}22; color: {color}; font-weight: 700; font-size: 0.82rem; padding: 3px 10px; border-radius: 6px; border: 1px solid {color}44; white-space: nowrap;">
+                    <div style="background: {color}22; color: {color}; font-weight: 700; font-size: 0.80rem; padding: 3px 10px; border-radius: 6px; border: 1px solid {color}44; white-space: nowrap;">
                         {delta_amt}
                     </div>
                 </div>
@@ -1144,29 +1185,6 @@ def _render_budget_tab(data: dict[str, Any]) -> None:
     st.markdown("#### ⚡ Live Meta Ad Set Budget Controller")
     st.caption("Adjust daily ad set budgets with AI recommended scaling increments (+20%, +$5, or custom) and sync directly to Meta:")
 
-    # Find live ad sets to manage dynamically directly from Meta API
-    live_adsets_from_meta = fetch_live_ad_sets()
-    if live_adsets_from_meta:
-        ad_sets_to_show = live_adsets_from_meta
-    else:
-        ad_sets_to_show = []
-        if issues:
-            for iss in issues:
-                set_id = iss.get("ad_set_id")
-                if set_id:
-                    ad_sets_to_show.append({
-                        "id": set_id,
-                        "name": iss.get("ad_set_name") or f"Ad Set {set_id}",
-                        "daily_budget": iss.get("daily_budget", 3.0),
-                        "status": iss.get("status", "PAUSED")
-                    })
-        ad_sets_to_show.insert(0, {
-            "id": "120249959902480182",
-            "name": 'Post: "🔥 2026 O/L ලියන අයට" (Active Winner)',
-            "daily_budget": 15.0,
-            "status": "ACTIVE"
-        })
-
     # Render Enterprise Budget Adjustment Cards
     for idx, aset in enumerate(ad_sets_to_show[:3]):
         set_id = str(aset.get("id", f"set_{idx}"))
@@ -1174,6 +1192,9 @@ def _render_budget_tab(data: dict[str, Any]) -> None:
         live_current_budget = float(aset.get("daily_budget") or 3.0)
         st_val = str(aset.get("status", "PAUSED")).upper()
         badge_st = "🟢 LIVE & ACTIVE" if st_val == "ACTIVE" else "⚪ PAUSED"
+
+        is_in_cooldown = set_id in st.session_state["applied_budget_actions"]
+        cooldown_tag = "<span style='color:#38bdf8; font-size:0.75rem; font-weight:700;'>• ⏳ 24H COOLDOWN ACTIVE</span>" if is_in_cooldown else ""
 
         with st.container():
             col_info, col_controls, col_actions = st.columns([1.8, 1.4, 0.8])
@@ -1184,7 +1205,7 @@ def _render_budget_tab(data: dict[str, Any]) -> None:
                     <div style="padding: 4px 0;">
                         <div style="font-weight: 700; color: #f8fafc; font-size: 0.95rem;">{set_name}</div>
                         <div style="font-size: 0.78rem; color: #94a3b8; margin-top: 2px;">
-                            ID: <code style="color:#a5b4fc;">{set_id}</code> • <b>{badge_st}</b>
+                            ID: <code style="color:#a5b4fc;">{set_id}</code> • <b>{badge_st}</b> {cooldown_tag}
                         </div>
                         <div style="font-size: 0.85rem; color: #34d399; margin-top: 4px; font-weight: 600;">
                             Live Meta Budget: ${live_current_budget:.2f}/day
@@ -1197,7 +1218,6 @@ def _render_budget_tab(data: dict[str, Any]) -> None:
             with col_controls:
                 # Provide enterprise Quick Preset suggestions (+20% scaling rule or custom)
                 rec_scaled_20 = round(live_current_budget * 1.20, 2)
-                rec_scaled_plus5 = round(live_current_budget + 5.0, 2)
                 
                 target_budget = st.number_input(
                     f"New Daily Budget ($USD/day)",
@@ -1220,7 +1240,13 @@ def _render_budget_tab(data: dict[str, Any]) -> None:
                             ok, msg = False, f"Meta API error: {e}"
 
                         if ok:
+                            # Record in session state to trigger cooldown state
+                            st.session_state["applied_budget_actions"][set_id] = {
+                                "new_budget": target_budget,
+                                "timestamp": datetime.now(timezone.utc).strftime("%H:%M:%S UTC")
+                            }
                             st.success(f"✅ Adjusted to ${target_budget:.2f}/day!")
+                            st.rerun()
                         else:
                             st.warning(f"ℹ️ {msg}")
 
