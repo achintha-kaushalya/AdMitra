@@ -285,6 +285,11 @@ def generate_ad_image(
         "phone": "https://images.unsplash.com/photo-1598327105666-5b89351aff97?w=1024&q=85",
         "headphone": "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=1024&q=85", # Headphones Studio
         "headset": "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=1024&q=85",
+        "tshirt": "https://images.unsplash.com/photo-1581655353564-df123a1eb820?w=1024&q=85", # Minimalist Premium White T-Shirt Studio Flatlay
+        "t-shirt": "https://images.unsplash.com/photo-1581655353564-df123a1eb820?w=1024&q=85",
+        "shirt": "https://images.unsplash.com/photo-1581655353564-df123a1eb820?w=1024&q=85",
+        "tee": "https://images.unsplash.com/photo-1581655353564-df123a1eb820?w=1024&q=85",
+        "streetwear": "https://images.unsplash.com/photo-1562157873-818bc0726f68?w=1024&q=85", # Color Collection of T-Shirts Studio
         "dress": "https://images.unsplash.com/photo-1539109136881-3be0616acf4b?w=1024&q=85", # Fashion Dress Studio
         "shoe": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=1024&q=85", # Red Nike Sneaker Studio
         "sneaker": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=1024&q=85",
