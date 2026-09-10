@@ -1169,10 +1169,10 @@ def _render_budget_tab(data: dict[str, Any]) -> None:
 
     # Render Budget Adjustment Cards
     for idx, aset in enumerate(ad_sets_to_show[:3]):
-        set_id = aset["id"]
-        set_name = aset["name"]
-        curr_b = float(aset["current_budget"] or 3.0)
-        st_val = aset["status"]
+        set_id = aset.get("id", f"set_{idx}")
+        set_name = aset.get("name", "Ad Set")
+        curr_b = float(aset.get("daily_budget") or aset.get("current_budget") or 3.0)
+        st_val = str(aset.get("status", "PAUSED")).upper()
 
         with st.container():
             col_b1, col_b2, col_b3 = st.columns([2.2, 1.3, 1.0])
