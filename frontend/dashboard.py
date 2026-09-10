@@ -1396,10 +1396,20 @@ def _render_content_tab(data: dict[str, Any]) -> None:
             
             if st.button("🪄 Generate 8K Ad Visual", type="primary", use_container_width=True):
                 with st.spinner("Rendering 8K commercial ad creative with Flux AI..."):
-                    img_url, img_bytes = generate_ad_image(t2i_prompt)
-                    st.session_state["creative_image_url"] = img_url
-                    st.session_state["creative_image_bytes"] = img_bytes
-                    st.session_state["last_vis_status"] = "✅ Visual generated successfully!"
+                    try:
+                        img_url, img_bytes = generate_ad_image(t2i_prompt)
+                        st.session_state["creative_image_url"] = img_url
+                        st.session_state["creative_image_bytes"] = img_bytes
+                        if img_bytes or img_url:
+                            st.session_state["last_vis_status"] = f"✅ Visual generated! (Size: {len(img_bytes) if img_bytes else 'URL streaming'})"
+                            st.session_state["last_vis_error"] = None
+                        else:
+                            st.session_state["last_vis_status"] = None
+                            st.session_state["last_vis_error"] = "⚠️ Empty response from image generation provider."
+                    except Exception as exc:
+                        import traceback
+                        st.session_state["last_vis_status"] = None
+                        st.session_state["last_vis_error"] = f"🚨 Generation Exception: {exc}\n{traceback.format_exc()}"
 
         elif vis_mode == "👗 Model Placement":
             st.caption("Upload product photo & prompt model placement (e.g. *'Modern model wearing this dress in bright white studio'*):")
@@ -1413,11 +1423,15 @@ def _render_content_tab(data: dict[str, Any]) -> None:
             )
             if st.button("✨ Transform on Virtual Model", type="primary", use_container_width=True):
                 with st.spinner("Synthesizing virtual studio model photoshoot..."):
-                    raw_bytes = uploaded_file.getvalue() if uploaded_file else None
-                    refined_p, img_url, img_bytes = transform_product_image(prod_name, transform_inst)
-                    st.session_state["creative_image_url"] = img_url
-                    st.session_state["creative_image_bytes"] = img_bytes
-                    st.session_state["last_vis_status"] = f"👗 Placement rendered! Prompt: {refined_p}"
+                    try:
+                        raw_bytes = uploaded_file.getvalue() if uploaded_file else None
+                        refined_p, img_url, img_bytes = transform_product_image(prod_name, transform_inst)
+                        st.session_state["creative_image_url"] = img_url
+                        st.session_state["creative_image_bytes"] = img_bytes
+                        st.session_state["last_vis_status"] = f"👗 Placement rendered! Prompt: {refined_p}"
+                        st.session_state["last_vis_error"] = None
+                    except Exception as exc:
+                        st.session_state["last_vis_error"] = f"🚨 Transform Exception: {exc}"
 
         else:
             direct_file = st.file_uploader("Upload Ad Poster (PNG/JPG)", type=["png", "jpg", "jpeg"], key="direct_upload_img")
@@ -1425,26 +1439,31 @@ def _render_content_tab(data: dict[str, Any]) -> None:
                 st.session_state["creative_image_bytes"] = direct_file.getvalue()
                 st.session_state["creative_image_url"] = None
                 st.session_state["last_vis_status"] = "✅ Poster loaded!"
+                st.session_state["last_vis_error"] = None
 
-        # Status Message
+        # Status & Diagnostic Messages
         if st.session_state.get("last_vis_status"):
             st.success(st.session_state["last_vis_status"])
+        if st.session_state.get("last_vis_error"):
+            st.error(st.session_state["last_vis_error"])
 
         # Live Static Image Preview Panel (Left Side Dedicated Panel)
         st.markdown("<br>", unsafe_allow_html=True)
         st.markdown("##### 🖼️ Visual Creative Preview Screen")
         
-        has_bytes = bool(st.session_state.get("creative_image_bytes"))
-        has_url = bool(st.session_state.get("creative_image_url"))
+        cur_bytes = st.session_state.get("creative_image_bytes")
+        cur_url = st.session_state.get("creative_image_url")
 
-        if has_bytes or has_url:
-            img_target = st.session_state["creative_image_bytes"] if has_bytes else st.session_state["creative_image_url"]
-            st.image(img_target, caption="AdMitra AI 1:1 Creative Visual (Ready to Publish)", use_container_width=True)
-            if st.button("🗑️ Reset / Clear Visual", use_container_width=True):
-                st.session_state["creative_image_bytes"] = None
-                st.session_state["creative_image_url"] = None
-                st.session_state["last_vis_status"] = None
-                st.rerun()
+        if cur_bytes:
+            try:
+                st.image(cur_bytes, caption="AdMitra AI 1:1 Creative Visual (Binary Loaded)", use_container_width=True)
+            except Exception as e:
+                st.error(f"Failed to display image bytes: {e}")
+        elif cur_url:
+            try:
+                st.image(cur_url, caption="AdMitra AI 1:1 Creative Visual (URL Stream)", use_container_width=True)
+            except Exception as e:
+                st.error(f"Failed to display image URL: {e}")
         else:
             st.markdown(
                 """
