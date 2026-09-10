@@ -1400,7 +1400,6 @@ def _render_content_tab(data: dict[str, Any]) -> None:
                     st.session_state["creative_image_url"] = img_url
                     st.session_state["creative_image_bytes"] = img_bytes
                     st.session_state["last_vis_status"] = "✅ Visual generated successfully!"
-                    st.rerun()
 
         elif vis_mode == "👗 Model Placement":
             st.caption("Upload product photo & prompt model placement (e.g. *'Modern model wearing this dress in bright white studio'*):")
@@ -1419,7 +1418,6 @@ def _render_content_tab(data: dict[str, Any]) -> None:
                     st.session_state["creative_image_url"] = img_url
                     st.session_state["creative_image_bytes"] = img_bytes
                     st.session_state["last_vis_status"] = f"👗 Placement rendered! Prompt: {refined_p}"
-                    st.rerun()
 
         else:
             direct_file = st.file_uploader("Upload Ad Poster (PNG/JPG)", type=["png", "jpg", "jpeg"], key="direct_upload_img")
@@ -1427,7 +1425,6 @@ def _render_content_tab(data: dict[str, Any]) -> None:
                 st.session_state["creative_image_bytes"] = direct_file.getvalue()
                 st.session_state["creative_image_url"] = None
                 st.session_state["last_vis_status"] = "✅ Poster loaded!"
-                st.rerun()
 
         # Status Message
         if st.session_state.get("last_vis_status"):
