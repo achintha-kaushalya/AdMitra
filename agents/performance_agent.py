@@ -79,16 +79,19 @@ def _summarize_metrics(
         cpm_delta = _percentage_delta(cpm, prev_cpm)
         ctr_delta = _percentage_delta(ctr, prev_ctr)
         roas_delta = _percentage_delta(roas, prev_roas)
+        cpr = float(campaign.get("cpr", 0.0) or 0.0)
+        reach = int(campaign.get("reach", 0) or 0)
+        results_count = int(campaign.get("results_count", 0) or 0)
 
-        # Estimate Audience Frequency (Impressions / Reach)
-        est_frequency = round(1.2 + (impressions / 25000.0), 2) if impressions > 0 else 1.25
+        # Use live audience frequency from Meta if available, else calculate
+        frequency = float(campaign.get("frequency") or (round(impressions / reach, 2) if reach > 0 else 1.25))
 
-        # Creative Fatigue Index
-        if est_frequency > 3.0 or (cpm_delta and cpm_delta > 25 and ctr_delta and ctr_delta < -10):
+        # Creative Fatigue Index based on real frequency & CPM movement
+        if frequency > 2.8 or (cpm_delta and cpm_delta > 25 and ctr_delta and ctr_delta < -10):
             fatigue_status = "FATIGUED"
             fatigue_color = "#f87171"
             fatigue_action = "Creative burned out. Immediate refresh required."
-        elif est_frequency >= 2.0 or (cpm_delta and cpm_delta > 15):
+        elif frequency >= 1.8 or (cpm_delta and cpm_delta > 15):
             fatigue_status = "SATURATING"
             fatigue_color = "#fbbf24"
             fatigue_action = "Audience approaching saturation. Prepare variant tests."
@@ -101,6 +104,8 @@ def _summarize_metrics(
         anomalies = []
         if roas >= 3.5:
             anomalies.append("🚀 Top Performer (ROAS > 3.5x)")
+        if cpr > 0:
+            anomalies.append(f"🎯 CPR: ${cpr:.3f}")
         if cpm_delta and cpm_delta > 20:
             anomalies.append(f"⚠️ CPM Spike (+{cpm_delta:.1f}%)")
         if ctr_delta and ctr_delta < -15:
@@ -119,9 +124,12 @@ def _summarize_metrics(
                 "current_ROAS": roas,
                 "prev_ROAS": prev_roas,
                 "ROAS_delta_percent": roas_delta,
+                "cpr": cpr,
+                "results_count": results_count,
+                "reach": reach,
                 "spend": spend,
                 "impressions": impressions,
-                "est_frequency": est_frequency,
+                "est_frequency": frequency,
                 "fatigue_status": fatigue_status,
                 "fatigue_color": fatigue_color,
                 "fatigue_action": fatigue_action,

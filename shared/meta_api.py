@@ -197,8 +197,13 @@ def fetch_live_campaign_metrics() -> Optional[List[Dict[str, Any]]]:
         return None
 
     try:
-        url = f"{GRAPH_BASE_URL}/{act_id}/campaigns?fields=id,name,status,effective_status,start_time,stop_time,objective,insights.date_preset(maximum){{spend,impressions,cpm,ctr,actions,purchase_roas}}&limit=25&access_token={token}"
-        res = httpx.get(url, timeout=8.0)
+        url = (
+            f"{GRAPH_BASE_URL}/{act_id}/campaigns?"
+            f"fields=id,name,status,effective_status,start_time,stop_time,objective,"
+            f"insights.date_preset(maximum){{spend,impressions,reach,cpm,ctr,frequency,cost_per_result,cost_per_action_type,actions,results,purchase_roas}}"
+            f"&limit=25&access_token={token}"
+        )
+        res = httpx.get(url, timeout=10.0)
         if res.status_code != 200:
             return None
 
@@ -210,8 +215,34 @@ def fetch_live_campaign_metrics() -> Optional[List[Dict[str, Any]]]:
             insights = insights_data[0] if insights_data else {}
             spend = float(insights.get("spend", 0.0) or 0.0)
             impressions = int(insights.get("impressions", 0) or 0)
+            reach = int(insights.get("reach", 0) or 0)
             cpm = float(insights.get("cpm", 0.0) or 0.0)
             ctr = float(insights.get("ctr", 0.0) or 0.0)
+            live_frequency = float(insights.get("frequency", 0.0) or 0.0)
+            
+            # Extract Cost Per Result (CPR)
+            cpr = 0.0
+            cpr_list = insights.get("cost_per_result", [])
+            if cpr_list and isinstance(cpr_list, list):
+                values = cpr_list[0].get("values", [])
+                if values and isinstance(values, list):
+                    cpr = float(values[0].get("value", 0.0) or 0.0)
+            
+            # Fallback CPR from cost_per_action_type if cost_per_result is empty
+            if cpr == 0.0 and insights.get("cost_per_action_type"):
+                for cpa in insights.get("cost_per_action_type", []):
+                    if cpa.get("action_type") in ("link_click", "post_engagement", "video_view", "onsite_conversion.messaging_conversation_started_7d"):
+                        cpr = float(cpa.get("value", 0.0) or 0.0)
+                        break
+
+            # Extract Total Results count
+            results_count = 0
+            results_list = insights.get("results", [])
+            if results_list and isinstance(results_list, list):
+                v_list = results_list[0].get("values", [])
+                if v_list and isinstance(v_list, list):
+                    results_count = int(float(v_list[0].get("value", 0) or 0))
+
             roas_list = insights.get("purchase_roas", [])
             roas = float(roas_list[0].get("value", 0.0) or 0.0) if roas_list else (2.5 if spend > 0 else 0.0)
 
@@ -223,7 +254,6 @@ def fetch_live_campaign_metrics() -> Optional[List[Dict[str, Any]]]:
             is_expired = False
             if stop_time:
                 try:
-                    # ISO format parsing
                     from datetime import datetime, timezone
                     import dateutil.parser
                     end_dt = dateutil.parser.parse(stop_time)
@@ -250,6 +280,10 @@ def fetch_live_campaign_metrics() -> Optional[List[Dict[str, Any]]]:
                 "prev_CTR": round(ctr * 1.05, 2) if ctr > 0 else 1.8,
                 "current_ROAS": round(roas, 2),
                 "prev_ROAS": round(roas * 0.95, 2) if roas > 0 else 2.0,
+                "cpr": round(cpr, 4) if cpr > 0 else 0.0,
+                "results_count": results_count,
+                "frequency": round(live_frequency, 2) if live_frequency > 0 else 1.25,
+                "reach": reach,
                 "spend": spend,
                 "impressions": impressions
             })

@@ -809,11 +809,12 @@ def _render_performance_tab(data: dict[str, Any]) -> None:
     if isinstance(metrics, list) and metrics:
         st.markdown("#### ⚡ Active Campaign Performance Tracking")
         for m in metrics[:4]:
-            col1, col2, col3, col4 = st.columns(4)
+            col1, col2, col3, col4, col5 = st.columns(5)
             c_name = m.get("name", "Campaign")
             cpm = m.get("current_CPM", 0.0)
             ctr = m.get("current_CTR", 0.0)
             roas = m.get("current_ROAS", 0.0)
+            cpr_val = m.get("cpr", 0.0)
             cpm_delta = m.get("CPM_delta_percent") or 0.0
             ctr_delta = m.get("CTR_delta_percent") or 0.0
             roas_delta = m.get("ROAS_delta_percent") or 0.0
@@ -821,8 +822,9 @@ def _render_performance_tab(data: dict[str, Any]) -> None:
             st.markdown(f"**📌 {c_name}**")
             col1.metric("Current CPM", f"${cpm:.2f}", f"{cpm_delta:+.1f}%", delta_color="inverse")
             col2.metric("Current CTR", f"{ctr:.2f}%", f"{ctr_delta:+.1f}%")
-            col3.metric("Current ROAS", f"{roas:.2f}x", f"{roas_delta:+.1f}%")
-            col4.metric("Total Spend", f"${m.get('spend', 0):,.2f}")
+            col3.metric("Cost / Result (CPR)", f"${cpr_val:.3f}" if cpr_val > 0 else "N/A", delta="Conversion Cost")
+            col4.metric("Current ROAS", f"{roas:.2f}x", f"{roas_delta:+.1f}%")
+            col5.metric("Total Spend", f"${m.get('spend', 0):,.2f}")
             st.divider()
 
     # --- 1. Creative Fatigue & Anomaly Detection Center ---
@@ -850,12 +852,10 @@ def _render_performance_tab(data: dict[str, Any]) -> None:
                                 {fatigue_status}
                             </span>
                         </div>
-                        <div style="font-size: 0.78rem; color: #94a3b8; margin-top: 6px;">
-                            Est. Audience Frequency: <b style="color:#f8fafc;">{freq:.2f}x</b>
+                        <div style="font-size: 1.3rem; font-weight: 800; color: #f8fafc; margin-top: 6px;">
+                            {freq:.2f}x <span style="font-size: 0.75rem; color: #94a3b8; font-weight: 500;">Live Frequency</span>
                         </div>
-                        <div style="font-size: 0.8rem; color: #cbd5e1; margin-top: 6px; line-height: 1.35;">
-                            {fatigue_action}
-                        </div>
+                        <div style="font-size: 0.78rem; color: #cbd5e1; margin-top: 4px;">{fatigue_action}</div>
                         {anomaly_badge}
                     </div>
                     """,
@@ -868,15 +868,16 @@ def _render_performance_tab(data: dict[str, Any]) -> None:
     st.markdown("#### 🔮 AI What-If Budget Scaling Simulator")
     st.caption("Simulate expected revenue, conversions, and estimated ROAS decay before increasing Meta ad spend:")
 
-    sim_col1, sim_col2 = st.columns([1.5, 2.5])
+    active_spend_total = sum(float(m.get("spend", 0.0) or 0.0) for m in metrics if "ACTIVE" in str(m.get("status", "")).upper())
+    base_spend = active_spend_total if active_spend_total > 0 else 50.0
+    base_roas = 2.50
+
+    sim_col1, sim_col2 = st.columns([1.2, 1.8])
     with sim_col1:
-        current_budget_val = 50.0
-        scale_percent = st.slider("Scale Daily Spend (%)", min_value=-50, max_value=200, value=25, step=5, format="%d%%")
-        est_new_spend = current_budget_val * (1 + (scale_percent / 100.0))
-        base_roas = 2.50
-        # Realistic diminishing return model (ROAS decays slightly as budget scales into broader audience)
-        decay_factor = 1.0 - (scale_percent * 0.0012) if scale_percent > 0 else 1.0 + (abs(scale_percent) * 0.001)
-        sim_roas = max(1.2, round(base_roas * decay_factor, 2))
+        scale_percent = st.slider("Scale Daily Spend (%)", min_value=-50, max_value=200, value=0, step=5, format="%d%%")
+        est_new_spend = base_spend * (1 + (scale_percent / 100.0))
+        decay_factor = (scale_percent / 100.0) * 0.15 if scale_percent > 0 else (scale_percent / 100.0) * 0.05
+        sim_roas = max(1.1, base_roas - decay_factor)
         sim_revenue = round(est_new_spend * sim_roas, 2)
 
     with sim_col2:
@@ -903,16 +904,23 @@ def _render_performance_tab(data: dict[str, Any]) -> None:
             else:
                 status_dot = "⚪ Inactive / Paused"
 
+            cpr = m.get("cpr", 0.0)
+            cpr_str = f"${cpr:.3f}" if cpr > 0 else "$0.00"
+            res_count = m.get("results_count", 0)
+
             table_rows.append({
                 "Campaign Name": m.get("name", "N/A"),
                 "Status": status_dot,
                 "Spend (USD)": f"${m.get('spend', 0.0):,.2f}",
+                "Cost / Result (CPR)": cpr_str,
+                "Results": f"{res_count:,}" if res_count > 0 else "-",
                 "CPM ($)": f"${m.get('current_CPM', 0.0):.2f}",
                 "CTR (%)": f"{m.get('current_CTR', 0.0):.2f}%",
                 "ROAS (x)": f"{m.get('current_ROAS', 0.0):.2f}x",
-                "Est. Frequency": f"{m.get('est_frequency', 1.25):.2f}x",
-                "Fatigue Health": m.get("fatigue_status", "FRESH"),
-                "Impressions": f"{m.get('impressions', 0):,}"
+                "Frequency": f"{m.get('est_frequency', 1.25):.2f}x",
+                "Reach": f"{m.get('reach', 0):,}" if m.get('reach') else "-",
+                "Impressions": f"{m.get('impressions', 0):,}",
+                "Fatigue Health": m.get("fatigue_status", "FRESH")
             })
         st.dataframe(table_rows, use_container_width=True)
 
