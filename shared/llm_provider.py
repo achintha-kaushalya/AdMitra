@@ -153,3 +153,55 @@ def generate_json(
             pass
 
     return fallback_dict or {}, "local-fallback"
+
+
+def generate_ad_image(prompt: str, seed: Optional[int] = None) -> tuple[Optional[str], Optional[bytes]]:
+    """
+    Generates high-resolution 1:1 e-commerce product ad imagery using Pollinations AI (Flux / SDXL model).
+    Returns (image_url, image_bytes).
+    """
+    import urllib.parse
+    import random
+    
+    clean_prompt = prompt.strip()
+    encoded_prompt = urllib.parse.quote(clean_prompt)
+    img_seed = seed or random.randint(10000, 999999)
+    image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&seed={img_seed}&nologo=true&enhance=true&model=flux"
+    
+    try:
+        with httpx.Client(timeout=25.0, follow_redirects=True) as client:
+            res = client.get(image_url)
+            if res.status_code == 200 and len(res.content) > 5000:
+                return image_url, res.content
+    except Exception as exc:
+        logger.info(f"Image generation download error: {exc}")
+        
+    return image_url, None
+
+
+def transform_product_image(
+    product_name: str,
+    user_transformation_prompt: str,
+    image_base64_or_desc: Optional[str] = None
+) -> tuple[str, str, Optional[bytes]]:
+    """
+    Image-to-Image / Product placement pipeline:
+    Synthesizes visual features of the uploaded product and generates an enhanced commercial studio visual.
+    Returns (refined_prompt, image_url, image_bytes).
+    """
+    # 1. Use LLM to synthesize an optimized photorealistic prompt
+    sys_prompt = "You are an elite commercial fashion & product advertising photographer."
+    craft_prompt = f"""
+Convert this product customization request into an ultra-detailed, photorealistic commercial ad visual prompt:
+Product: {product_name}
+Desired Scene / Virtual Model Setting: {user_transformation_prompt}
+
+Output ONLY the final image generation prompt (under 60 words, English, hyperrealistic 8k commercial photography, cinematic studio lighting, white/minimalist backdrop).
+"""
+    refined_prompt, _ = generate_text(craft_prompt, system_prompt=sys_prompt, fallback_text=f"{product_name}, {user_transformation_prompt}, professional commercial studio photography, 8k, sharp focus")
+    refined_prompt = refined_prompt.replace('"', '').strip()
+    
+    # 2. Generate the transformed high-end visual
+    img_url, img_bytes = generate_ad_image(refined_prompt)
+    return refined_prompt, img_url, img_bytes
+

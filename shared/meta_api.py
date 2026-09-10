@@ -345,13 +345,52 @@ def publish_page_post(message: str) -> tuple[bool, str]:
             "message": message,
             "access_token": token
         }
-        res = httpx.post(url, data=payload, timeout=8.0)
+        res = httpx.post(url, data=payload, timeout=10.0)
         if res.status_code == 200:
             post_id = res.json().get("id")
             return True, f"Post published successfully to Facebook Page! (ID: {post_id})"
         return False, f"Page publish failed: {res.text}"
     except Exception as exc:
         return False, f"Page publish exception: {exc}"
+
+
+def publish_page_photo(image_data: bytes | str, caption: str) -> tuple[bool, str]:
+    """
+    Publishes a photo post directly to the connected Facebook Page.
+    Supports either raw image bytes or a public image URL.
+    """
+    token, _ = get_meta_credentials()
+    page_id = os.getenv("META_PAGE_ID", "61572729900273")
+    if not token:
+        return False, "Missing Meta token"
+
+    try:
+        url = f"{GRAPH_BASE_URL}/{page_id}/photos"
+        if isinstance(image_data, str) and (image_data.startswith("http://") or image_data.startswith("https://")):
+            # Publish via public URL
+            payload = {
+                "url": image_data,
+                "caption": caption,
+                "access_token": token
+            }
+            res = httpx.post(url, data=payload, timeout=20.0)
+        else:
+            # Publish via multipart binary upload
+            data = {
+                "caption": caption,
+                "access_token": token
+            }
+            files = {
+                "source": ("creative_ad.jpg", image_data, "image/jpeg")
+            }
+            res = httpx.post(url, data=data, files=files, timeout=25.0)
+
+        if res.status_code == 200:
+            photo_id = res.json().get("id") or res.json().get("post_id")
+            return True, f"Photo post published successfully to Facebook Page! (ID: {photo_id})"
+        return False, f"Photo upload failed: {res.text}"
+    except Exception as exc:
+        return False, f"Photo upload exception: {exc}"
 
 
 def update_ad_set_budget(ad_set_id: str, new_daily_budget_usd: float) -> tuple[bool, str]:
