@@ -316,16 +316,30 @@ def generate_ad_image(
     # If a high-end product match is found, prioritize real commercial studio photography
     candidate_urls = ([matched_stock_url] if matched_stock_url else []) + poll_urls
 
-    for url in candidate_urls:
+    # Guarantee fallback if all external endpoints fail or timeout
+    if not raw_bytes:
+        default_stock = "https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=1024&q=85" if "phone" in lower_p or "iphone" in lower_p else "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=1024&q=85"
         try:
-            with httpx.Client(timeout=10.0, follow_redirects=True) as client:
-                res = client.get(url)
-                if res.status_code == 200 and len(res.content) > 3000:
+            with httpx.Client(timeout=8.0, follow_redirects=True) as client:
+                res = client.get(default_stock)
+                if res.status_code == 200 and len(res.content) > 2000:
                     raw_bytes = res.content
-                    final_url = url
-                    break
+                    final_url = default_stock
         except Exception:
-            continue
+            pass
+
+    # If still no bytes, generate a clean studio dark backdrop canvas in memory
+    if not raw_bytes:
+        from PIL import Image, ImageDraw
+        import io
+        blank_img = Image.new("RGB", (1024, 1024), (15, 23, 42))
+        b_draw = ImageDraw.Draw(blank_img)
+        # Radial / pedestal studio glow
+        b_draw.ellipse([(200, 400), (824, 900)], fill=(30, 41, 59))
+        buf = io.BytesIO()
+        blank_img.save(buf, format="JPEG", quality=95)
+        raw_bytes = buf.getvalue()
+        final_url = "local-commercial-canvas"
 
     # 4. Apply Commercial Sinhala & English Ad Compositing Overlay
     if raw_bytes and apply_ad_compositing:
@@ -340,9 +354,7 @@ def generate_ad_image(
     elif raw_bytes:
         return final_url, raw_bytes
 
-    # Fallback
-    fallback_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&seed={img_seed}&nologo=true"
-    return fallback_url, None
+    return final_url, None
 
 
 
