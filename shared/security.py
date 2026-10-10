@@ -10,12 +10,14 @@ Author  : Member 1 — Backend Lead
 Project : AdMitra (IT3041 — IRWA, SLIIT)
 """
 
+from __future__ import annotations
+
 import os
 import re
 import time
 import threading
 from collections import deque
-from typing import Deque
+from typing import Deque, Optional, Union
 
 from cryptography.fernet import Fernet
 from dotenv import load_dotenv

@@ -41,7 +41,7 @@ def _call_gemini_rest(prompt: str, system_prompt: Optional[str] = None) -> Optio
     }
 
     try:
-        res = httpx.post(url, json=payload, timeout=4.5)
+        res = httpx.post(url, json=payload, timeout=12.0)
         if res.status_code == 200:
             data = res.json()
             candidates = data.get("candidates", [])

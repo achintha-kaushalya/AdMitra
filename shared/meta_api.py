@@ -31,6 +31,26 @@ def get_meta_credentials() -> tuple[Optional[str], Optional[str]]:
     return token, act_id
 
 
+def get_page_access_token(page_id: str) -> Optional[str]:
+    """
+    Attempts to fetch a Page Access Token for page_id using the configured User token.
+    Falls back to the configured META_ACCESS_TOKEN if not found.
+    """
+    token, _ = get_meta_credentials()
+    if not token:
+        return None
+    try:
+        url = f"{GRAPH_BASE_URL}/me/accounts?access_token={token}"
+        res = httpx.get(url, timeout=5.0)
+        if res.status_code == 200:
+            for page in res.json().get("data", []):
+                if str(page.get("id")) == str(page_id):
+                    return page.get("access_token")
+    except Exception:
+        pass
+    return token
+
+
 def is_meta_configured() -> bool:
     """Check if Meta API credentials are present."""
     token, act_id = get_meta_credentials()
@@ -334,8 +354,8 @@ def publish_page_post(message: str) -> tuple[bool, str]:
     """
     Publishes an organic marketing post directly to the connected Facebook Page.
     """
-    token, _ = get_meta_credentials()
-    page_id = os.getenv("META_PAGE_ID", "61572729900273")
+    page_id = os.getenv("META_PAGE_ID", "529836200217502")
+    token = get_page_access_token(page_id)
     if not token:
         return False, "Missing Meta token"
 
@@ -359,8 +379,8 @@ def publish_page_photo(image_data: bytes | str, caption: str) -> tuple[bool, str
     Publishes a photo post directly to the connected Facebook Page.
     Supports either raw image bytes or a public image URL.
     """
-    token, _ = get_meta_credentials()
-    page_id = os.getenv("META_PAGE_ID", "61572729900273")
+    page_id = os.getenv("META_PAGE_ID", "529836200217502")
+    token = get_page_access_token(page_id)
     if not token:
         return False, "Missing Meta token"
 

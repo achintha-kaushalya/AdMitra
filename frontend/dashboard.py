@@ -15,6 +15,8 @@ Author  : Member 4 — Frontend & NLP Lead
 Project : AdMitra (IT3041 — IRWA, SLIIT)
 """
 
+from __future__ import annotations
+
 import os
 import sys
 
@@ -871,7 +873,8 @@ def _render_performance_tab(data: dict[str, Any]) -> None:
             freq = m.get("est_frequency", 1.25)
             c_name = m.get("name", f"Ad Set #{idx+1}")
             anomalies = m.get("anomalies", [])
-            anomaly_badge = f"<div style='margin-top:6px;'>{' '.join([f'<span class=\"badge-med\">{a}</span>' for a in anomalies])}</div>" if anomalies else ""
+            anomaly_spans = " ".join([f"<span class='badge-med'>{a}</span>" for a in anomalies])
+            anomaly_badge = f"<div style='margin-top:6px;'>{anomaly_spans}</div>" if anomalies else ""
 
             with cols_fatigue[idx]:
                 st.markdown(
@@ -899,7 +902,11 @@ def _render_performance_tab(data: dict[str, Any]) -> None:
     st.markdown("#### 🔮 AI What-If Budget Scaling Simulator")
     st.caption("Simulate expected revenue, conversions, and estimated ROAS decay before increasing Meta ad spend:")
 
-    active_spend_total = sum(float(m.get("spend", 0.0) or 0.0) for m in metrics if "ACTIVE" in str(m.get("status", "")).upper())
+    active_spend_total = sum(
+        float(m.get("spend", 0.0) or 0.0)
+        for m in metrics
+        if isinstance(m, dict) and "ACTIVE" in str(m.get("status", "")).upper()
+    )
     base_spend = active_spend_total if active_spend_total > 0 else 50.0
     base_roas = 2.50
 
