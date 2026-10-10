@@ -76,8 +76,23 @@ except ImportError:
     def sync_live_meta_campaigns():
         return 0, "Vector store sync unavailable."
 
+try:
+    from frontend.theme import NAV_ITEMS, brand, briefing_card, inject_theme, kpi_card, kpi_row, page_header, top_bar
+    from frontend.overview import render_overview
+except ImportError:  # when run with frontend/ as cwd
+    from theme import NAV_ITEMS, brand, briefing_card, inject_theme, kpi_card, kpi_row, page_header, top_bar  # type: ignore
+    from overview import render_overview  # type: ignore
+
 
 API_URL = "http://localhost:8000/check-account"
+
+
+def _show_image(src: Any, **kwargs: Any) -> None:
+    """st.image that works on both old (use_column_width) and new (use_container_width) Streamlit."""
+    try:
+        st.image(src, use_container_width=True, **kwargs)
+    except TypeError:
+        st.image(src, use_column_width=True, **kwargs)
 
 
 # ---------------------------------------------------------------------------
@@ -822,43 +837,105 @@ def _render_performance_tab(data: dict[str, Any]) -> None:
     similar = result.get("similar_campaigns", [])
     recommendations = result.get("recommendations", [])
 
-    st.subheader("📈 Campaign Performance & Trend Analytics")
-    
-    # AI Executive Briefing Card
-    st.markdown(
-        f"""
-        <div class="glass-card" style="margin-bottom: 1rem; border-left: 4px solid #6366f1;">
-            <div style="font-weight: 700; font-size: 0.95rem; color: #a5b4fc; margin-bottom: 4px;">
-                🤖 AI SENIOR ANALYST BRIEFING
-            </div>
-            <div style="color: #f1f5f9; font-size: 0.92rem; line-height: 1.5;">
-                {summary}
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+    # --- AI Senior Analyst Briefing: short bullets ---
+    briefing_card("🤖 AI Analyst Briefing", str(summary), tone="ok", max_items=5)
 
     if isinstance(metrics, list) and metrics:
-        st.markdown("#### ⚡ Active Campaign Performance Tracking")
-        for m in metrics[:4]:
-            col1, col2, col3, col4, col5 = st.columns(5)
-            c_name = m.get("name", "Campaign")
-            cpm = m.get("current_CPM", 0.0)
-            ctr = m.get("current_CTR", 0.0)
-            roas = m.get("current_ROAS", 0.0)
-            cpr_val = m.get("cpr", 0.0)
-            cpm_delta = m.get("CPM_delta_percent") or 0.0
-            ctr_delta = m.get("CTR_delta_percent") or 0.0
-            roas_delta = m.get("ROAS_delta_percent") or 0.0
+        import plotly.graph_objects as go
 
-            st.markdown(f"**📌 {c_name}**")
-            col1.metric("Current CPM", f"${cpm:.2f}", f"{cpm_delta:+.1f}%", delta_color="inverse")
-            col2.metric("Current CTR", f"{ctr:.2f}%", f"{ctr_delta:+.1f}%")
-            col3.metric("Cost / Result (CPR)", f"${cpr_val:.3f}" if cpr_val > 0 else "N/A", delta="Conversion Cost")
-            col4.metric("Current ROAS", f"{roas:.2f}x", f"{roas_delta:+.1f}%")
-            col5.metric("Total Spend", f"${m.get('spend', 0):,.2f}")
-            st.divider()
+        rows = [m for m in metrics if isinstance(m, dict)]
+
+        def _f(v: Any) -> float:
+            try:
+                return float(v or 0.0)
+            except (TypeError, ValueError):
+                return 0.0
+
+        def _pct(cur: float, prev: float) -> float:
+            return ((cur - prev) / prev * 100.0) if prev else 0.0
+
+        def _trend(delta: float, inverse: bool = False) -> str:
+            if abs(delta) < 0.05:
+                return "flat"
+            good = delta < 0 if inverse else delta > 0
+            return "up" if good else "down"
+
+        # --- Portfolio KPIs ---
+        st.markdown('<div class="am-card-title">Portfolio Summary</div>'
+                    '<div class="am-card-sub">Aggregated across all tracked campaigns, change vs. previous period</div>',
+                    unsafe_allow_html=True)
+        n = max(len(rows), 1)
+        cur_cpm = sum(_f(m.get("current_CPM")) for m in rows) / n
+        prv_cpm = sum(_f(m.get("prev_CPM")) for m in rows) / n
+        cur_ctr = sum(_f(m.get("current_CTR")) for m in rows) / n
+        prv_ctr = sum(_f(m.get("prev_CTR")) for m in rows) / n
+        cur_roas = sum(_f(m.get("current_ROAS")) for m in rows) / n
+        prv_roas = sum(_f(m.get("prev_ROAS")) for m in rows) / n
+        tot_spend = sum(_f(m.get("spend")) for m in rows)
+        tot_results = int(sum(_f(m.get("results_count")) for m in rows))
+        d_cpm, d_ctr, d_roas = _pct(cur_cpm, prv_cpm), _pct(cur_ctr, prv_ctr), _pct(cur_roas, prv_roas)
+        avg_cpr = tot_spend / tot_results if tot_results else 0.0
+        kpi_row([
+            kpi_card("Total Spend", f"${tot_spend:,.2f}", f"{len(rows)} campaigns", "flat", "💵"),
+            kpi_card("Avg CPM", f"${cur_cpm:.2f}", f"{d_cpm:+.1f}% vs prev", _trend(d_cpm, inverse=True), "📣"),
+            kpi_card("Avg CTR", f"{cur_ctr:.2f}%", f"{d_ctr:+.1f}% vs prev", _trend(d_ctr), "🖱️"),
+            kpi_card("Avg ROAS", f"{cur_roas:.2f}x", f"{d_roas:+.1f}% vs prev", _trend(d_roas), "📈"),
+            kpi_card("Cost / Result", f"${avg_cpr:.3f}" if avg_cpr else "N/A", f"{tot_results:,} results", "flat", "🎯"),
+        ])
+        st.markdown("<div style='height:18px'></div>", unsafe_allow_html=True)
+
+        # --- Trend charts: current vs previous period ---
+        chart_layout = dict(
+            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+            font=dict(family="Inter, sans-serif", color="#c3cde0", size=12),
+            margin=dict(l=8, r=8, t=10, b=8), height=300, barmode="group",
+            legend=dict(orientation="h", y=1.15, x=0),
+            xaxis=dict(gridcolor="#1c2740", zeroline=False, tickangle=-25),
+            yaxis=dict(gridcolor="#1c2740", zeroline=False),
+        )
+        top_rows = sorted(rows, key=lambda m: _f(m.get("spend")), reverse=True)[:8]
+        labels = [str(m.get("name", "Ad")).replace("Post: ", "").strip('"')[:18] for m in top_rows]
+
+        ch1, ch2 = st.columns(2)
+        with ch1:
+            st.markdown('<div class="am-card-title">CPM Trend</div>'
+                        '<div class="am-card-sub">Cost per 1,000 impressions, lower is better</div>',
+                        unsafe_allow_html=True)
+            f1 = go.Figure()
+            f1.add_bar(x=labels, y=[_f(m.get("prev_CPM")) for m in top_rows], name="Previous", marker_color="#334155")
+            f1.add_bar(x=labels, y=[_f(m.get("current_CPM")) for m in top_rows], name="Current", marker_color="#6366f1")
+            f1.update_layout(**chart_layout)
+            st.plotly_chart(f1, use_container_width=True, config={"displayModeBar": False})
+        with ch2:
+            st.markdown('<div class="am-card-title">CTR Trend</div>'
+                        '<div class="am-card-sub">Click-through rate, higher is better</div>',
+                        unsafe_allow_html=True)
+            f2 = go.Figure()
+            f2.add_bar(x=labels, y=[_f(m.get("prev_CTR")) for m in top_rows], name="Previous", marker_color="#334155")
+            f2.add_bar(x=labels, y=[_f(m.get("current_CTR")) for m in top_rows], name="Current", marker_color="#10b981")
+            f2.update_layout(**chart_layout)
+            st.plotly_chart(f2, use_container_width=True, config={"displayModeBar": False})
+
+        # --- Campaign drill-down ---
+        st.markdown('<div class="am-card-title">Campaign Drill-down</div>'
+                    '<div class="am-card-sub">Select a campaign to inspect its metrics</div>',
+                    unsafe_allow_html=True)
+        names = [str(m.get("name", f"Campaign {i+1}")) for i, m in enumerate(rows)]
+        pick = st.selectbox("Campaign", names, label_visibility="collapsed", key="perf_focus_campaign")
+        m = rows[names.index(pick)]
+        cpm_d = _pct(_f(m.get("current_CPM")), _f(m.get("prev_CPM")))
+        ctr_d = _pct(_f(m.get("current_CTR")), _f(m.get("prev_CTR")))
+        roas_d = _pct(_f(m.get("current_ROAS")), _f(m.get("prev_ROAS")))
+        cpr_v = _f(m.get("cpr"))
+        status_txt = str(m.get("status", "")).title()
+        kpi_row([
+            kpi_card("CPM", f"${_f(m.get('current_CPM')):.2f}", f"{cpm_d:+.1f}%", _trend(cpm_d, True), "📣"),
+            kpi_card("CTR", f"{_f(m.get('current_CTR')):.2f}%", f"{ctr_d:+.1f}%", _trend(ctr_d), "🖱️"),
+            kpi_card("ROAS", f"{_f(m.get('current_ROAS')):.2f}x", f"{roas_d:+.1f}%", _trend(roas_d), "📈"),
+            kpi_card("Cost / Result", f"${cpr_v:.3f}" if cpr_v > 0 else "N/A", f"{int(_f(m.get('results_count'))):,} results", "flat", "🎯"),
+            kpi_card("Spend", f"${_f(m.get('spend')):,.2f}", status_txt or "—", "flat", "💵"),
+        ])
+        st.markdown("<div style='height:14px'></div>", unsafe_allow_html=True)
 
     # --- 1. Creative Fatigue & Anomaly Detection Center ---
     if isinstance(metrics, list) and len(metrics) > 0:
@@ -1072,7 +1149,7 @@ def _render_performance_tab(data: dict[str, Any]) -> None:
 
     # --- Quick Workflow Navigation to Budget Reallocator ---
     st.markdown("<div style='height: 16px;'></div>", unsafe_allow_html=True)
-    st.info("💡 **Ready to rebalance ad spend?** Switch to **Tab 3: 💰 Budget Reallocation** to adjust daily ad set budgets in real-time.")
+    st.info("💡 **Ready to rebalance ad spend?** Open **💰 Budget** in the sidebar to adjust daily ad set budgets in real-time.")
 
     st.markdown("---")
     st.markdown("#### 🧠 Historical Vector Memory Sync (Enterprise RAG)")
@@ -1104,23 +1181,8 @@ def _render_budget_tab(data: dict[str, Any]) -> None:
     diag_res = _agent_result(data, "diagnostic")
     issues = diag_res.get("issues", [])
 
-    st.subheader("💰 Smart Budget & ROAS Reallocation")
-    st.caption("AI-powered portfolio rebalancing engine • Shift ad spend from bleeding ad sets to high-ROAS converters")
-
-    # AI Financial Summary Card
-    st.markdown(
-        f"""
-        <div class="glass-card" style="margin-bottom: 1.2rem; border-left: 4px solid #10b981;">
-            <div style="font-weight: 700; font-size: 0.95rem; color: #6ee7b7; margin-bottom: 4px;">
-                🤖 AI CHIEF FINANCIAL OFFICER (CFO) BRIEFING
-            </div>
-            <div style="color: #f1f5f9; font-size: 0.92rem; line-height: 1.5;">
-                {summary}
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+    # AI Financial Summary: short bullets
+    briefing_card("🤖 AI CFO Briefing", str(summary), tone="ok", max_items=5)
 
     # Session state to track applied budget changes
     if "applied_budget_actions" not in st.session_state:
@@ -1397,9 +1459,17 @@ def _render_content_tab(data: dict[str, Any]) -> None:
         )
 
         if vis_mode == "✨ Text-to-Image":
-            product_hint = st.session_state.get("last_product", "Smart Noise-Canceling Headphones")
-            default_prompt = f"extreme close-up hero shot of {product_hint}, centered commercial product photography, dramatic softbox lighting, 8k commercial ad asset"
-            t2i_prompt = st.text_area("AI Visual Prompt", value=default_prompt, height=80, key="t2i_prompt_input")
+            curr_prod = st.session_state.get("last_product", "Smart Noise-Canceling Headphones")
+            expected_prompt = f"extreme close-up hero shot of {curr_prod}, centered commercial product photography, dramatic softbox lighting, 8k commercial ad asset"
+            
+            # If product changed in sidebar, sync to text area state
+            if "_prev_synced_product" not in st.session_state or st.session_state["_prev_synced_product"] != curr_prod:
+                st.session_state["_prev_synced_product"] = curr_prod
+                st.session_state["t2i_prompt_input"] = expected_prompt
+            elif "t2i_prompt_input" not in st.session_state:
+                st.session_state["t2i_prompt_input"] = expected_prompt
+            
+            t2i_prompt = st.text_area("AI Visual Prompt", height=80, key="t2i_prompt_input")
             
             # Poster Customization Expandable
             with st.expander("🛠️ Poster Branding & Typography Settings", expanded=False):
@@ -1424,8 +1494,11 @@ def _render_content_tab(data: dict[str, Any]) -> None:
                         shop_val = st.session_state.get("in_shop_name", "Lanka Ads")
                         contact_val = st.session_state.get("in_contact_text", "WhatsApp: 078 183 3131 | Lanka Ads")
                         
+                        # Use active prompt from text area or product name directly
+                        prompt_to_use = (st.session_state.get("t2i_prompt_input") or t2i_prompt or curr_prod).strip()
+                        
                         img_url, img_bytes = generate_ad_image(
-                            t2i_prompt,
+                            prompt_to_use,
                             headline_sinhala=sin_head_val,
                             headline_english=eng_head_val,
                             badge_text=offer_val,
@@ -1441,6 +1514,7 @@ def _render_content_tab(data: dict[str, Any]) -> None:
                         else:
                             st.session_state["last_vis_status"] = None
                             st.session_state["last_vis_error"] = "⚠️ Empty response from image generation provider."
+                        st.rerun()
                     except Exception as exc:
                         import traceback
                         st.session_state["last_vis_status"] = None
@@ -1476,6 +1550,7 @@ def _render_content_tab(data: dict[str, Any]) -> None:
                         st.session_state["creative_image_bytes"] = img_bytes
                         st.session_state["last_vis_status"] = f"👗 Placement rendered! Prompt: {refined_p}"
                         st.session_state["last_vis_error"] = None
+                        st.rerun()
                     except Exception as exc:
                         st.session_state["last_vis_error"] = f"🚨 Transform Exception: {exc}"
 
@@ -1486,6 +1561,7 @@ def _render_content_tab(data: dict[str, Any]) -> None:
                 st.session_state["creative_image_url"] = None
                 st.session_state["last_vis_status"] = "✅ Poster loaded!"
                 st.session_state["last_vis_error"] = None
+                st.rerun()
 
         # Status & Diagnostic Messages
         if st.session_state.get("last_vis_status"):
@@ -1502,12 +1578,12 @@ def _render_content_tab(data: dict[str, Any]) -> None:
 
         if cur_bytes:
             try:
-                st.image(cur_bytes, caption="AdMitra AI 1:1 Creative Visual (Binary Loaded)", use_container_width=True)
+                _show_image(cur_bytes, caption="AdMitra AI 1:1 Creative Visual (Binary Loaded)")
             except Exception as e:
                 st.error(f"Failed to display image bytes: {e}")
         elif cur_url:
             try:
-                st.image(cur_url, caption="AdMitra AI 1:1 Creative Visual (URL Stream)", use_container_width=True)
+                _show_image(cur_url, caption="AdMitra AI 1:1 Creative Visual (URL Stream)")
             except Exception as e:
                 st.error(f"Failed to display image URL: {e}")
         else:
@@ -1521,8 +1597,6 @@ def _render_content_tab(data: dict[str, Any]) -> None:
                 """,
                 unsafe_allow_html=True
             )
-        if cur_bytes: st.image(cur_bytes, use_container_width=True)
-        elif cur_url: st.image(cur_url, use_container_width=True)
 
     # Right Column: Bilingual Copy Studios & Live Feed Previews
     with col_studio_right:
@@ -1735,16 +1809,21 @@ def main() -> None:
     )
 
     _inject_custom_css()
+    inject_theme()
 
     # Sidebar Interface
     with st.sidebar:
-        st.markdown("### ⚙️ Campaign Control Panel")
-        st.caption("Configure campaign parameters & customer comments")
+        brand()
+        nav_keys = [k for k, _, _ in NAV_ITEMS]
+        nav_labels = {k: f"{icon}  {label}" for k, icon, label in NAV_ITEMS}
+        page = st.radio("Navigation", nav_keys, format_func=lambda k: nav_labels[k],
+                        label_visibility="collapsed", key="nav_page")
+        st.markdown('<div class="am-nav-label">Campaign Controls</div>', unsafe_allow_html=True)
 
         st.markdown("---")
         st.markdown("##### 🎯 Ad Creative Parameters")
-        product = st.text_input("Product Name", value="Smart Noise-Canceling Headphones")
-        offer = st.text_input("Special Offer", value="20% OFF + Free Express Shipping")
+        product = st.text_input("Product Name", value=st.session_state.get("last_product", "Smart Noise-Canceling Headphones"), key="sidebar_product_input")
+        offer = st.text_input("Special Offer", value=st.session_state.get("last_offer", "20% OFF + Free Express Shipping"), key="sidebar_offer_input")
         tone = st.selectbox(
             "Tone of Voice",
             ["friendly", "professional", "urgent"],
@@ -1753,6 +1832,7 @@ def main() -> None:
                 "professional": "💼 Professional & Sleek",
                 "urgent": "⚡ Urgent & High-Conversion",
             }.get(x, x),
+            key="sidebar_tone_input"
         )
 
         st.markdown("---")
@@ -1776,6 +1856,8 @@ def main() -> None:
 
     # Initial Run Logic or Session Cache
     if run_audit_btn or "audit_data" not in st.session_state:
+        st.session_state["last_product"] = product.strip()
+        st.session_state["last_offer"] = offer.strip()
         payload = {
             "product": product.strip(),
             "offer": offer.strip(),
@@ -1788,42 +1870,52 @@ def main() -> None:
             st.session_state["audit_data"] = data
             st.session_state["used_mock"] = used_mock
             st.session_state["error_msg"] = error_msg
+            # Reset generated image state so new product gets a fresh visual
+            st.session_state["creative_image_url"] = None
+            st.session_state["creative_image_bytes"] = None
 
     data = st.session_state.get("audit_data", {})
     used_mock = st.session_state.get("used_mock", True)
     error_msg = st.session_state.get("error_msg", None)
 
     # Render Main View
-    _render_hero_banner(used_mock, error_msg)
-    _render_summary_metrics(data)
+    page_label = {k: label for k, _, label in NAV_ITEMS}[page]
+    meta_live = bool(os.getenv("META_ACCESS_TOKEN") and os.getenv("META_AD_ACCOUNT_ID"))
+    top_bar(page_label, used_mock, meta_live)
 
-    st.markdown("<br>", unsafe_allow_html=True)
+    if used_mock and error_msg:
+        st.toast("Orchestrator offline: running in standalone mode", icon="ℹ️")
 
-    # 5 Interactive Cards via Tabs
-    tabs = st.tabs(
-        [
-            "🚨 Diagnostic Report",
-            "📈 Performance Analysis",
-            "💰 Budget Reallocation",
-            "✍️ Bilingual Ad Creatives",
-            "💬 Customer Engagement",
-        ]
-    )
-
-    with tabs[0]:
+    if page == "overview":
+        perf = _agent_result(data, "performance")
+        perf_metrics = perf.get("metrics", [])
+        diag = _agent_result(data, "diagnostic")
+        eng = _agent_result(data, "engagement")
+        sent = eng.get("sentiment", {})
+        sentiment_label = sent.get("label", "N/A") if isinstance(sent, dict) else "N/A"
+        render_overview(
+            perf_metrics if isinstance(perf_metrics, list) else [],
+            _calculate_health_score(data),
+            diag.get("issues", []),
+            sentiment_label,
+        )
+    elif page == "diagnostic":
+        page_header("Diagnostics", "Account health, policy compliance and billing checks.")
         _render_diagnostic_tab(data)
-    with tabs[1]:
+    elif page == "performance":
+        page_header("Performance", "Campaign trends, creative fatigue and what-if scaling.")
         _render_performance_tab(data)
-    with tabs[2]:
+    elif page == "budget":
+        page_header("Budget", "AI budget reallocation across live ad sets.")
         _render_budget_tab(data)
-    with tabs[3]:
+    elif page == "creative":
+        page_header("Creative Studio", "Generate bilingual ad copy and visuals, then approve and publish.")
         _render_content_tab(data)
-    with tabs[4]:
+    elif page == "engagement":
+        page_header("Engagement", "Sentiment analysis and AI reply drafting for customer comments.")
         _render_engagement_tab(data)
-
-    # Raw JSON Expander
-    st.markdown("<br>", unsafe_allow_html=True)
-    with st.expander("🔍 Developer Tools: MCP Aggregated Response JSON"):
+    else:
+        page_header("Developer", "Raw MCP aggregated response for debugging and export.")
         st.json(data)
         st.download_button(
             "📥 Download Audit Report JSON",

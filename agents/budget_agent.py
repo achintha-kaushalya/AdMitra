@@ -528,6 +528,13 @@ def _build_prompt(
                 "Clearly state that a human must approve "
                 "any budget modification."
             ),
+            (
+                "FORMAT RULES: Reply ONLY with 3 to 5 markdown "
+                "bullet points starting with '- '. Each bullet must be "
+                "one short line (max 18 words), start with a bold label "
+                "such as **Status:**, **Action:** or **Insight:**. "
+                "No headings, no paragraphs, no numbered lists, no intro or outro."
+            ),
         ]
     )
 

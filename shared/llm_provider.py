@@ -192,22 +192,36 @@ def compose_commercial_ad_poster(
             alpha = int(250 * ((y - 650) / 374.0))
             draw.line([(0, y), (1024, y)], fill=(10, 15, 30, alpha))
 
-        # Fonts setup (Nirmala UI for Sinhala, Arial Bold for English)
-        font_dir = "C:/Windows/Fonts"
-        try:
-            sin_font = ImageFont.truetype(f"{font_dir}/Nirmala.ttc", 40)
-            eng_font = ImageFont.truetype(f"{font_dir}/arialbd.ttf", 36)
-            badge_font = ImageFont.truetype(f"{font_dir}/arialbd.ttf", 32)
-            brand_font = ImageFont.truetype(f"{font_dir}/arialbd.ttf", 28)
-            cta_font = ImageFont.truetype(f"{font_dir}/Nirmala.ttc", 28)
-            cta_btn_font = ImageFont.truetype(f"{font_dir}/arialbd.ttf", 26)
-        except Exception:
-            sin_font = ImageFont.load_default()
-            eng_font = ImageFont.load_default()
-            badge_font = ImageFont.load_default()
-            brand_font = ImageFont.load_default()
-            cta_font = ImageFont.load_default()
-            cta_btn_font = ImageFont.load_default()
+        # Fonts setup (Support Mac OS, Windows, and Linux)
+        import os
+        font_paths = [
+            "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
+            "/Library/Fonts/Arial Bold.ttf",
+            "/System/Library/Fonts/Helvetica.ttc",
+            "/System/Library/Fonts/Supplemental/Sinhala Sangam MN.ttc",
+            "/Library/Fonts/Sinhala Sangam MN.ttc",
+            "C:/Windows/Fonts/Nirmala.ttc",
+            "C:/Windows/Fonts/arialbd.ttf"
+        ]
+        
+        def _get_font(size: int, is_bold: bool = False, prefer_sinhala: bool = False):
+            if prefer_sinhala:
+                for p in ["/System/Library/Fonts/Supplemental/Sinhala Sangam MN.ttc", "/Library/Fonts/Sinhala Sangam MN.ttc", "C:/Windows/Fonts/Nirmala.ttc", "/System/Library/Fonts/Helvetica.ttc"]:
+                    if os.path.exists(p):
+                        try: return ImageFont.truetype(p, size)
+                        except Exception: pass
+            for p in ["/System/Library/Fonts/Supplemental/Arial Bold.ttf", "/System/Library/Fonts/Helvetica.ttc", "/Library/Fonts/Arial.ttf", "C:/Windows/Fonts/arialbd.ttf"]:
+                if os.path.exists(p):
+                    try: return ImageFont.truetype(p, size)
+                    except Exception: pass
+            return ImageFont.load_default()
+
+        sin_font = _get_font(40, is_bold=True, prefer_sinhala=True)
+        eng_font = _get_font(36, is_bold=True)
+        badge_font = _get_font(32, is_bold=True)
+        brand_font = _get_font(28, is_bold=True)
+        cta_font = _get_font(28, is_bold=True, prefer_sinhala=True)
+        cta_btn_font = _get_font(26, is_bold=True)
 
         # Clean string inputs
         clean_sin_head = headline_sinhala.replace("✨", "").replace("🔥", "").replace("👉", "").strip()
@@ -298,13 +312,55 @@ def generate_ad_image(
         "camera": "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=1024&q=85", # Professional Camera Studio
         "bag": "https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=1024&q=85", # Leather Handbag Studio
     }
+
+    # Extended categories (every image URL below was visually verified to match its label)
+    _U = "https://images.unsplash.com/photo-{}?w=1024&q=85"
+    _EXTRA_ASSETS = {
+        # Vehicles
+        _U.format("1494976388531-d1058494cdd8"): ["car", "vehicle", "sedan", "sports car", "automobile"],
+        _U.format("1519641471654-76ce0107ad1b"): ["suv", "jeep", "crossover"],
+        _U.format("1527786356703-4b100091cd2c"): ["van", "minivan", "caravan", "campervan", "camper"],
+        _U.format("1559416523-140ddc3d238c"): ["pickup", "pick-up", "double cab"],
+        _U.format("1601584115197-04ecc0da31d7"): ["truck", "lorry", "cargo", "trailer"],
+        _U.format("1570125909232-eb263c188f7e"): ["bus", "coach"],
+        _U.format("1558981806-ec527fa84c39"): ["motorcycle", "motorbike", "scooter", "bike"],
+        _U.format("1485965120184-e220f721d03e"): ["bicycle", "cycle", "cycling"],
+        _U.format("1530267981375-f0de937f5f13"): ["tractor"],
+        # Electronics
+        _U.format("1593359677879-a4bb92f829d1"): ["tv", "television", "smart tv"],
+        _U.format("1590658268037-6bf12165a8df"): ["earbud", "earbuds", "airpod", "airpods", "earphone", "earphones"],
+        _U.format("1608043152269-423dbba4e7e1"): ["speaker", "bluetooth speaker", "soundbar"],
+        _U.format("1544244015-0df4b3ffc6b0"): ["tablet", "ipad"],
+        _U.format("1587829741301-dc798b83add3"): ["keyboard"],
+        _U.format("1527864550417-7fd91fc51a46"): ["mouse"],
+        _U.format("1546868871-7041f2a55e12"): ["smartwatch", "smart watch", "apple watch"],
+        _U.format("1502920917128-1aa500764cbd"): ["dslr", "mirrorless"],
+        # Phones (aliases)
+        "https://images.unsplash.com/photo-1598327105666-5b89351aff97?w=1024&q=85": ["smartphone", "mobile", "android", "samsung", "mobile phone"],
+        # Fashion & accessories
+        _U.format("1542272604-787c3835535d"): ["jeans", "denim", "trousers"],
+        _U.format("1556821840-3a63f95609a7"): ["hoodie", "sweatshirt", "jacket"],
+        _U.format("1553062407-98eeb64c6a62"): ["backpack", "school bag", "rucksack"],
+        _U.format("1572635196237-14b3f281503f"): ["sunglass", "sunglasses", "glasses", "eyewear"],
+        _U.format("1605100804763-247f67b3557e"): ["jewelry", "jewellery", "ring", "necklace", "bracelet", "earring"],
+        # Home & lifestyle
+        _U.format("1555041469-a586c61ea9bc"): ["sofa", "couch"],
+        _U.format("1586023492125-27b2c045efd7"): ["furniture", "chair", "interior", "decor"],
+        _U.format("1602143407151-7111542de6e8"): ["bottle", "water bottle", "flask", "tumbler"],
+        _U.format("1495474472287-4d71bcdd2085"): ["coffee", "cafe", "latte"],
+    }
+    for _url, _aliases in _EXTRA_ASSETS.items():
+        for _alias in _aliases:
+            PRODUCT_STUDIO_ASSETS.setdefault(_alias, _url)
     
-    # Check if prompt targets known product categories
+    # Check if prompt targets known product categories.
+    # Whole-word match (plural-aware), longest keys first, so 'headphones' never matches 'phone'.
+    import re
     matched_stock_url = None
     lower_p = raw_prompt.lower()
-    for cat_key, asset_url in PRODUCT_STUDIO_ASSETS.items():
-        if cat_key in lower_p:
-            matched_stock_url = asset_url
+    for cat_key in sorted(PRODUCT_STUDIO_ASSETS, key=len, reverse=True):
+        if re.search(rf"(?<![a-z]){re.escape(cat_key)}s?(?![a-z])", lower_p):
+            matched_stock_url = PRODUCT_STUDIO_ASSETS[cat_key]
             break
 
     # 2. Build photorealistic commercial prompt
@@ -343,14 +399,7 @@ def generate_ad_image(
 
     # Guarantee fallback if all external endpoints fail
     if not raw_bytes:
-        if matched_stock_url:
-            default_stock = matched_stock_url
-        elif "laptop" in lower_p or "msi" in lower_p:
-            default_stock = "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=1024&q=85"
-        elif "phone" in lower_p or "iphone" in lower_p:
-            default_stock = "https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=1024&q=85"
-        else:
-            default_stock = "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=1024&q=85"
+        default_stock = matched_stock_url or "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=1024&q=85"
         try:
             with httpx.Client(timeout=8.0, follow_redirects=True) as client:
                 res = client.get(default_stock)

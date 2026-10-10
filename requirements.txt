@@ -36,3 +36,4 @@ httpx==0.27.2                 # Used by Streamlit dashboard for API calls
 # --- Dev / Testing ---
 pytest==8.3.3
 httpx==0.27.2                 # Also used by FastAPI TestClient
+plotly>=5.20
