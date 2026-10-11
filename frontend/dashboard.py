@@ -395,6 +395,20 @@ def _inject_custom_css() -> None:
         .diag-card-inner:hover {
             border-color: rgba(99, 102, 241, 0.35);
         }
+
+        .diag-item-card {
+            background: rgba(15, 23, 42, 0.7);
+            border: 1px solid rgba(148, 163, 184, 0.14);
+            border-radius: 12px;
+            padding: 16px 18px;
+            margin-bottom: 12px;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+            transition: all 0.2s ease;
+        }
+        .diag-item-card:hover {
+            border-color: rgba(99, 102, 241, 0.4);
+            background: rgba(15, 23, 42, 0.85);
+        }
         </style>
         """,
         unsafe_allow_html=True,
@@ -693,12 +707,15 @@ def _render_diagnostic_tab(data: dict[str, Any]) -> None:
         bud = pillars.get("budget", {"score": 90, "label": "Billing & Budget", "status": "Active"})
         b_score = bud.get("score", 90)
         billing_status = result.get("billing_status", "OK")
+        clean_bill_display = billing_status.replace("_", " ").title()
+        if len(clean_bill_display) > 16:
+            clean_bill_display = clean_bill_display[:14] + "…"
         st.markdown(
             f"""
             <div class="glass-card" style="padding: 12px 14px;">
                 <div style="font-size: 0.8rem; color: #94a3b8; font-weight: 600;">💳 BILLING & BUDGET</div>
-                <div style="font-size: 1.5rem; font-weight: 800; color: {'#34d399' if billing_status == 'OK' else '#f87171'}; margin: 4px 0;">
-                    {billing_status}
+                <div style="font-size: 1.25rem; font-weight: 800; color: {'#34d399' if billing_status == 'OK' else '#f87171'}; margin: 6px 0 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{billing_status}">
+                    {clean_bill_display}
                 </div>
                 <div style="font-size: 0.75rem; color: #cbd5e1;">Payment Status: <b>{bud.get('status', 'OK')}</b></div>
             </div>
@@ -723,7 +740,7 @@ def _render_diagnostic_tab(data: dict[str, Any]) -> None:
     st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
 
     # --- 2. Enterprise Action Bar: Auto-Pilot Toggle & Filter Tabs ---
-    col_act1, col_act2, col_act3 = st.columns([2.2, 1.4, 1.4])
+    col_act1, col_act2, col_act3 = st.columns([2.4, 1.3, 1.3])
     with col_act1:
         st.markdown(f"#### 🔍 Flagged Delivery Blockers ({len(issues)} Items)")
     with col_act2:
@@ -768,9 +785,23 @@ def _render_diagnostic_tab(data: dict[str, Any]) -> None:
             else:
                 badge_class = "badge-low"
             
-            ad_name = issue.get("ad_set_name") or issue.get("ad_name") or f"Ad Set #{issue.get('ad_set_id', '')}"
-            ad_set_id = issue.get("ad_set_id") or issue.get("target_id", "")
+            raw_id = issue.get("ad_set_id") or issue.get("target_id") or ""
             issue_type = issue.get("type", "Issue").replace("_", " ").title()
+            
+            # Meaningful title fallback
+            raw_name = issue.get("ad_set_name") or issue.get("ad_name")
+            if raw_name:
+                ad_name = raw_name
+            elif raw_id and raw_id != "N/A":
+                ad_name = f"Ad Set #{raw_id}"
+            elif "billing" in str(issue.get("type", "")).lower() or "billing" in str(issue.get("details", "")).lower():
+                ad_name = "Meta Account Billing & Payment Method"
+            elif "policy" in str(issue.get("type", "")).lower():
+                ad_name = "Meta Ad Creative Compliance"
+            else:
+                ad_name = f"Campaign Blocker: {issue_type}"
+
+            ad_set_id = raw_id
             msg = issue.get("details") or issue.get("message") or "Ad set is paused and not delivering impressions."
             daily_budget = issue.get("daily_budget", 0.0)
             impr_loss = issue.get("est_impr_loss", 850)
@@ -782,22 +813,22 @@ def _render_diagnostic_tab(data: dict[str, Any]) -> None:
             budget_chip = f"<span style='color:#94a3b8; font-size:0.75rem;'>• Budget: <b>${daily_budget:.2f}/d</b></span>" if daily_budget > 0 else ""
             loss_chip = f"<span style='color:#f87171; font-size:0.75rem;'>• Lost Reach: <b>~{impr_loss:,} impr/d</b></span>" if impr_loss > 0 else ""
 
-            # Card Container
-            col_card_body, col_card_actions = st.columns([3.4, 1.6])
+            # Unified Card Container with inline actions
+            col_card_body, col_card_actions = st.columns([3.7, 1.3])
             with col_card_body:
                 st.markdown(
                     f"""
-                    <div class="diag-card-inner">
+                    <div class="diag-item-card">
                         <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
                             <div style="flex: 1;">
                                 <div style="font-weight: 700; font-size: 0.98rem; color: #f8fafc; line-height: 1.35;">
                                     📢 {ad_name}
                                 </div>
-                                <div style="font-size: 0.76rem; color: #64748b; margin-top: 3px;">
+                                <div style="font-size: 0.76rem; color: #64748b; margin-top: 4px;">
                                     Target ID: <code style="color:#a5b4fc; background:rgba(99,102,241,0.1); padding:1px 5px; border-radius:4px;">{ad_set_id or 'N/A'}</code> • Type: <b style="color:#cbd5e1;">{issue_type}</b> {budget_chip} {loss_chip}
                                 </div>
                             </div>
-                            <span class="{badge_class}">{severity.upper()}</span>
+                            <span class="{badge_class}" style="margin-left: 8px;">{severity.upper()}</span>
                         </div>
                         <div style="color: #cbd5e1; font-size: 0.85rem; margin-top: 8px; line-height: 1.4;">
                             ⚠️ {msg}
@@ -807,17 +838,20 @@ def _render_diagnostic_tab(data: dict[str, Any]) -> None:
                     unsafe_allow_html=True,
                 )
             with col_card_actions:
-                st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
+                st.markdown("<div style='height: 14px;'></div>", unsafe_allow_html=True)
                 col_btn_res, col_btn_meta = st.columns([1.1, 0.9])
                 with col_btn_res:
                     status_raw = issue.get("status", "PAUSED")
                     btn_label = "🟢 Resume" if status_raw == "PAUSED" else "🚀 Rerun"
-                    if ad_set_id and st.button(btn_label, key=f"resume_{ad_set_id}_{idx}", use_container_width=True):
-                        ok, text = update_ad_set_status(ad_set_id, "ACTIVE")
-                        if ok:
-                            st.success(f"✅ {text}")
-                        else:
-                            st.warning(f"ℹ️ {text}")
+                    if ad_set_id and ad_set_id != "N/A":
+                        if st.button(btn_label, key=f"resume_{ad_set_id}_{idx}", use_container_width=True):
+                            ok, text = update_ad_set_status(ad_set_id, "ACTIVE")
+                            if ok:
+                                st.success(f"✅ {text}")
+                            else:
+                                st.warning(f"ℹ️ {text}")
+                    else:
+                        st.button("⚙️ Fix", key=f"fix_action_{idx}", disabled=True, use_container_width=True)
                 with col_btn_meta:
                     st.link_button("🔗 Meta", meta_deeplink, use_container_width=True)
 
