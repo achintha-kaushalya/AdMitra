@@ -124,6 +124,7 @@ def _diagnose(account: dict[str, Any]) -> dict[str, Any]:
     critical_issues = [i for i in issues if i.get("severity") in ("critical", "high", "warning")]
 
     return {
+        "source": account.get("source", "mock"),
         "account_id": account.get("account_id"),
         "account_name": account.get("account_name"),
         "currency": account.get("currency", "USD"),

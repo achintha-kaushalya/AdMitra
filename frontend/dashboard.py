@@ -1915,8 +1915,13 @@ def main() -> None:
     # Render Main View
     page_label = {k: label for k, _, label in NAV_ITEMS}[page]
     diag_res = _agent_result(data, "diagnostic")
-    meta_live = (diag_res.get("source") == "live_meta_api") or (data.get("source") == "live_meta_api")
-    top_bar(page_label, used_mock, meta_live, account_name=diag_res.get("account_name", "AdMitra Workspace"))
+    acc_name = diag_res.get("account_name", "")
+    meta_live = (
+        diag_res.get("source") == "live_meta_api"
+        or data.get("source") == "live_meta_api"
+        or (bool(acc_name) and acc_name != "AdMitra Demo Account" and acc_name != "Meta Ad Account")
+    )
+    top_bar(page_label, used_mock, meta_live, account_name=acc_name or "AdMitra Workspace")
 
     if used_mock and error_msg:
         st.toast("Orchestrator offline: running in standalone mode", icon="ℹ️")
