@@ -75,7 +75,7 @@ def fetch_live_ad_account() -> Optional[Dict[str, Any]]:
     try:
         # 1. Fetch Account Details
         acc_url = f"{GRAPH_BASE_URL}/{act_id}?fields=name,account_status,currency,balance,amount_spent&access_token={token}"
-        acc_res = httpx.get(acc_url, timeout=8.0)
+        acc_res = httpx.get(acc_url, timeout=15.0)
         if acc_res.status_code != 200:
             logger.warning(f"Meta Account fetch failed: {acc_res.text}")
             if "OAuthException" in acc_res.text or "Error validating access token" in acc_res.text:
@@ -85,12 +85,12 @@ def fetch_live_ad_account() -> Optional[Dict[str, Any]]:
 
         # 2. Fetch Ad Sets
         adsets_url = f"{GRAPH_BASE_URL}/{act_id}/adsets?fields=id,name,status,daily_budget,effective_status,campaign_id,created_time&limit=30&access_token={token}"
-        adsets_res = httpx.get(adsets_url, timeout=5.0)
+        adsets_res = httpx.get(adsets_url, timeout=15.0)
         adsets_data = adsets_res.json().get("data", []) if adsets_res.status_code == 200 else []
 
         # 3. Fetch Ads & Disapproval Reviews
         ads_url = f"{GRAPH_BASE_URL}/{act_id}/ads?fields=id,name,status,effective_status,adset_id,creative&limit=40&access_token={token}"
-        ads_res = httpx.get(ads_url, timeout=5.0)
+        ads_res = httpx.get(ads_url, timeout=15.0)
         ads_data = ads_res.json().get("data", []) if ads_res.status_code == 200 else []
 
         # Map ads to their respective ad sets
@@ -225,8 +225,9 @@ def fetch_live_campaign_metrics() -> Optional[List[Dict[str, Any]]]:
             f"insights.date_preset(maximum){{spend,impressions,reach,cpm,ctr,frequency,cost_per_result,cost_per_action_type,actions,results,purchase_roas}}"
             f"&limit=25&access_token={token}"
         )
-        res = httpx.get(url, timeout=10.0)
+        res = httpx.get(url, timeout=25.0)
         if res.status_code != 200:
+            logger.warning(f"Meta live metrics fetch failed: {res.text}")
             return None
 
         data = res.json().get("data", [])
