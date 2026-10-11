@@ -78,6 +78,8 @@ def fetch_live_ad_account() -> Optional[Dict[str, Any]]:
         acc_res = httpx.get(acc_url, timeout=8.0)
         if acc_res.status_code != 200:
             logger.warning(f"Meta Account fetch failed: {acc_res.text}")
+            if "OAuthException" in acc_res.text or "Error validating access token" in acc_res.text:
+                _token_invalid_cache = True
             return None
         acc_data = acc_res.json()
 

@@ -40,18 +40,35 @@ def render_overview(metrics: list, health_score: int, issues: list, sentiment: s
     total_spend = sum(_num(m.get("spend")) for m in rows)
     total_results = sum(_num(m.get("results_count")) for m in rows)
     impressions = sum(_num(m.get("impressions")) for m in rows)
-    active = [m for m in rows if "ACTIVE" in str(m.get("status", "")).upper()]
+    
+    # Active sets: check both status and effective_status
+    active_sets = [
+        m for m in rows 
+        if "ACTIVE" in str(m.get("status", "")).upper() 
+        or "ACTIVE" in str(m.get("effective_status", "")).upper()
+    ]
+    active_count = len(active_sets) if active_sets else len(rows)
+
     roas_vals = [_num(m.get("current_ROAS")) for m in rows if _num(m.get("current_ROAS")) > 0]
-    ctr_vals = [_num(m.get("current_CTR")) for m in rows if _num(m.get("current_CTR")) > 0]
     avg_roas = sum(roas_vals) / len(roas_vals) if roas_vals else 0.0
-    avg_ctr = sum(ctr_vals) / len(ctr_vals) if ctr_vals else 0.0
+
+    # Impressions-weighted CTR calculation
+    total_clicks = sum(_num(m.get("clicks")) for m in rows if _num(m.get("clicks")) > 0)
+    if total_clicks > 0 and impressions > 0:
+        avg_ctr = (total_clicks / impressions) * 100.0
+    else:
+        # Fallback to impressions-weighted average of CTR
+        weighted_ctr_sum = sum(_num(m.get("current_CTR")) * _num(m.get("impressions")) for m in rows)
+        avg_ctr = (weighted_ctr_sum / impressions) if impressions > 0 else (sum(_num(m.get("current_CTR")) for m in rows) / len(rows) if rows else 0.0)
+
+    results_label = f"{int(total_results):,} conversions" if total_results > 0 else "Delivery active"
 
     kpi_row(
         [
             kpi_card("Total Spend", f"${total_spend:,.2f}", f"{len(rows)} ad sets tracked", "flat", "💵"),
             kpi_card("Avg ROAS", f"{avg_roas:.2f}x", "Return on ad spend", "up" if avg_roas >= 2 else "down", "📈"),
-            kpi_card("Avg CTR", f"{avg_ctr:.2f}%", f"{int(impressions):,} impressions", "flat", "🖱️"),
-            kpi_card("Active Ad Sets", str(len(active)), f"{int(total_results):,} total results", "up" if active else "flat", "🚀"),
+            kpi_card("Avg CTR", f"{avg_ctr:.2f}%", f"{int(impressions):,} impressions", "up" if avg_ctr >= 1.5 else "flat", "🖱️"),
+            kpi_card("Active Ad Sets", str(active_count), results_label, "up" if active_count > 0 else "flat", "🚀"),
             kpi_card("Account Health", f"{health_score}/100", f"{len(issues)} open issues",
                      "up" if health_score >= 80 else "down", "🛡️"),
         ]
