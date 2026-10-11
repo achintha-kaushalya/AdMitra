@@ -1352,8 +1352,8 @@ def _render_budget_tab(data: dict[str, Any]) -> None:
                 target_budget = st.number_input(
                     f"New Daily Budget ($USD/day)",
                     min_value=1.0,
-                    max_value=500.0,
-                    value=live_current_budget,
+                    max_value=max(10000.0, float(live_current_budget) * 2),
+                    value=max(1.0, min(float(live_current_budget), 10000.0)),
                     step=1.0,
                     key=f"budget_ctrl_{set_id}",
                     help=f"Enterprise 20% Safe Scaling Target: ${rec_scaled_20:.2f}/day"
