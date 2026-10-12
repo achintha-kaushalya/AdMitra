@@ -736,8 +736,11 @@ def render_initial_loader() -> None:
     """
     Renders an Apple-grade futuristic startup loading screen with 
     the brand logo, radiant cyan laser ray scan sweep, and progress indicator.
+    STRICTLY appears ONLY once on initial app load, never on sub-navigation or button clicks.
     """
-    # Only render on fresh session or page load
+    if st.session_state.get("_initial_loader_shown", False):
+        return
+    st.session_state["_initial_loader_shown"] = True
     logo_b64 = get_logo_base64()
     if logo_b64:
         img_tag = f'<img src="data:image/jpeg;base64,{logo_b64}" class="am-scan-logo" alt="AdMitra" />'
