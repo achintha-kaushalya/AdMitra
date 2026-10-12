@@ -235,34 +235,88 @@ def compose_commercial_ad_poster(
         draw.ellipse([(58, 58), (80, 80)], fill=(99, 102, 241, 255))
         draw.text((95, 54), clean_brand, fill=(255, 255, 255, 255), font=brand_font)
 
+        # High-Fidelity Complex Text Shaper for Sinhala (HarfBuzz + FreeType + Noto Sans Sinhala)
+        noto_sinhala_path = os.path.join(os.path.dirname(__file__), "..", "frontend", "assets", "fonts", "NotoSansSinhala-Bold.ttf")
+        noto_sinhala_path = os.path.abspath(noto_sinhala_path)
+
+        def _draw_text_high_quality(target_overlay, text_to_draw, xy, font_size, fill_color, prefer_sinhala=False):
+            # If Sinhala text and HarfBuzz/FreeType + Noto font is available, use true complex shaping
+            if prefer_sinhala and os.path.exists(noto_sinhala_path):
+                try:
+                    import uharfbuzz as hb
+                    import freetype
+
+                    face = freetype.Face(noto_sinhala_path)
+                    face.set_char_size(font_size * 64)
+                    with open(noto_sinhala_path, 'rb') as f_font:
+                        hb_face = hb.Face(f_font.read())
+                    hb_font = hb.Font(hb_face)
+                    hb_font.scale = (font_size * 64, font_size * 64)
+
+                    buf = hb.Buffer()
+                    buf.add_str(text_to_draw)
+                    buf.guess_segment_properties()
+                    hb.shape(hb_font, buf)
+
+                    cur_x, cur_y = xy
+                    # Baseline offset adjustment for FreeType
+                    cur_y += int(font_size * 0.85)
+
+                    for g_info, pos_info in zip(buf.glyph_infos, buf.glyph_positions):
+                        face.load_glyph(g_info.codepoint, freetype.FT_LOAD_RENDER)
+                        glyph_slot = face.glyph
+                        b_map = glyph_slot.bitmap
+
+                        gx = int(cur_x + (pos_info.x_offset / 64.0) + glyph_slot.bitmap_left)
+                        gy = int(cur_y - (pos_info.y_offset / 64.0) - glyph_slot.bitmap_top)
+
+                        gw, gh = b_map.width, b_map.rows
+                        if gw > 0 and gh > 0:
+                            alpha_mask = Image.frombytes('L', (gw, gh), bytes(b_map.buffer))
+                            solid_color = Image.new('RGBA', (gw, gh), fill_color)
+                            target_overlay.paste(solid_color, (gx, gy), alpha_mask)
+
+                        cur_x += (pos_info.x_advance / 64.0)
+                        cur_y -= (pos_info.y_advance / 64.0)
+                    return
+                except Exception as ex:
+                    logger.info(f"HarfBuzz shaping fallback: {ex}")
+
+            # Fallback to standard PIL draw with best available system font
+            f = _get_font(font_size, is_bold=True, prefer_sinhala=prefer_sinhala)
+            draw.text(xy, text_to_draw, fill=fill_color, font=f)
+
         # Bottom Typography Banner based on target_lang
         t_lang = (target_lang or "bilingual").lower()
         if "eng" in t_lang:
             # Pure English Ad Poster Layout
-            draw.text((50, 730), clean_eng_head[:55], fill=(254, 240, 138, 255), font=eng_font)
-            draw.text((50, 795), f"Exclusive Online Offer • Limited Time Deals", fill=(248, 250, 252, 255), font=eng_sub_font)
+            _draw_text_high_quality(overlay, clean_eng_head[:55], (50, 730), 40, (254, 240, 138, 255), prefer_sinhala=False)
+            _draw_text_high_quality(overlay, "Exclusive Online Offer • Limited Time Deals", (50, 795), 28, (248, 250, 252, 255), prefer_sinhala=False)
             bottom_cta_text = clean_cta if any(c.isascii() for c in clean_cta) else "Order Online Today • Fast Islandwide Delivery"
             button_label = "SHOP NOW"
+            prefer_btn_si = False
         elif "sin" in t_lang:
-            # Pure Sinhala Ad Poster Layout
-            draw.text((50, 730), clean_sin_head[:55], fill=(254, 240, 138, 255), font=sin_font)
-            draw.text((50, 795), "දිවයින පුරා බෙදාහැරීම • විශේෂ මිල අඩු කිරීම්", fill=(248, 250, 252, 255), font=sin_font)
+            # Pure Sinhala Ad Poster Layout with HarfBuzz complex shaping
+            _draw_text_high_quality(overlay, clean_sin_head[:55], (50, 725), 42, (254, 240, 138, 255), prefer_sinhala=True)
+            _draw_text_high_quality(overlay, "දිවයින පුරා බෙදාහැරීම • විශේෂ මිල අඩු කිරීම්", (50, 795), 32, (248, 250, 252, 255), prefer_sinhala=True)
             bottom_cta_text = clean_cta
             button_label = "ඇණවුම් කරන්න"
+            prefer_btn_si = True
         else:
             # Bilingual Layout (Both)
-            draw.text((50, 725), clean_sin_head[:55], fill=(254, 240, 138, 255), font=sin_font)
-            draw.text((50, 795), clean_eng_head[:60], fill=(248, 250, 252, 255), font=eng_font)
+            _draw_text_high_quality(overlay, clean_sin_head[:55], (50, 720), 40, (254, 240, 138, 255), prefer_sinhala=True)
+            _draw_text_high_quality(overlay, clean_eng_head[:60], (50, 790), 36, (248, 250, 252, 255), prefer_sinhala=False)
             bottom_cta_text = clean_cta
             button_label = "ORDER NOW"
+            prefer_btn_si = False
 
         # Bottom Action Bar / CTA Ribbon
         draw.rounded_rectangle([(50, 880), (974, 965)], radius=18, fill=(79, 70, 229, 250), outline=(199, 210, 254, 230), width=2)
-        draw.text((75, 905), bottom_cta_text[:45], fill=(255, 255, 255, 255), font=cta_font)
+        _draw_text_high_quality(overlay, bottom_cta_text[:45], (75, 902), 28, (255, 255, 255, 255), prefer_sinhala=True)
         
         # Inner CTA Button (Shop Now)
         draw.rounded_rectangle([(710, 892), (955, 952)], radius=12, fill=(255, 255, 255, 255))
-        draw.text((735, 907), button_label, fill=(67, 56, 202, 255), font=cta_btn_font)
+        _draw_text_high_quality(overlay, button_label, (730, 905), 26, (67, 56, 202, 255), prefer_sinhala=prefer_btn_si)
 
         # Merge layers
         final_img = Image.alpha_composite(img, overlay).convert("RGB")
