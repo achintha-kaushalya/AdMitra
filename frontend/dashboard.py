@@ -1987,15 +1987,12 @@ def _render_home_tab(data: dict[str, Any]) -> None:
     )
 
     repo_video_path = Path(__file__).parent / "assets" / "showcase_video.mov"
-    local_dev_video_path = Path("/Users/achinthakaushalya/Documents/SLIIT/3rd Year 2nd Sem/IRWA/1011 IRWA cut.mov")
-    fallback_video_path = Path(__file__).parent.parent / "linkedin-video.mp4"
+    local_dev_video_path = Path("/Users/achinthakaushalya/Documents/SLIIT/3rd Year 2nd Sem/IRWA/1011 IRWA v2.mov")
     
     if repo_video_path.exists():
         st.video(str(repo_video_path))
     elif local_dev_video_path.exists():
         st.video(str(local_dev_video_path))
-    elif fallback_video_path.exists():
-        st.video(str(fallback_video_path))
     else:
         st.info("Demo showcase video ready for playback.")
 
