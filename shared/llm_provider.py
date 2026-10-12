@@ -235,36 +235,65 @@ def compose_commercial_ad_poster(
         draw.ellipse([(58, 58), (80, 80)], fill=(99, 102, 241, 255))
         draw.text((95, 54), clean_brand, fill=(255, 255, 255, 255), font=brand_font)
 
-        # High-Fidelity Complex Text Shaper for Sinhala (HarfBuzz + FreeType + Noto Sans Sinhala)
-        noto_sinhala_path = os.path.join(os.path.dirname(__file__), "..", "frontend", "assets", "fonts", "NotoSansSinhala-Bold.ttf")
-        noto_sinhala_path = os.path.abspath(noto_sinhala_path)
+        # High-Fidelity Complex Text Shaper with Dual Font Fallback (Sinhala + Latin)
+        noto_sinhala_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend", "assets", "fonts", "NotoSansSinhala-Bold.ttf"))
+        noto_latin_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend", "assets", "fonts", "NotoSans-Bold.ttf"))
 
         def _draw_text_high_quality(target_overlay, text_to_draw, xy, font_size, fill_color, prefer_sinhala=False):
-            # If Sinhala text and HarfBuzz/FreeType + Noto font is available, use true complex shaping
-            if prefer_sinhala and os.path.exists(noto_sinhala_path):
+            # Clean symbols for maximum font compatibility
+            text_to_draw = text_to_draw.replace("•", "-").replace("▪", "-").strip()
+            
+            # Check if text contains Sinhala characters
+            has_sinhala = any(0x0D80 <= ord(c) <= 0x0DFF for c in text_to_draw)
+            
+            # Select primary font: if text has Sinhala, use NotoSansSinhala; if purely Latin/English/Digits, use NotoSans
+            chosen_font_path = noto_sinhala_path if (has_sinhala and os.path.exists(noto_sinhala_path)) else noto_latin_path
+            if not os.path.exists(chosen_font_path) and os.path.exists(noto_latin_path):
+                chosen_font_path = noto_latin_path
+
+            if os.path.exists(chosen_font_path):
                 try:
                     import uharfbuzz as hb
                     import freetype
 
-                    face = freetype.Face(noto_sinhala_path)
-                    face.set_char_size(font_size * 64)
-                    with open(noto_sinhala_path, 'rb') as f_font:
-                        hb_face = hb.Face(f_font.read())
-                    hb_font = hb.Font(hb_face)
-                    hb_font.scale = (font_size * 64, font_size * 64)
+                    face_si = freetype.Face(chosen_font_path)
+                    face_si.set_char_size(font_size * 64)
+                    with open(chosen_font_path, 'rb') as f_font:
+                        hb_face_si = hb.Face(f_font.read())
+                    hb_font_si = hb.Font(hb_face_si)
+                    hb_font_si.scale = (font_size * 64, font_size * 64)
+
+                    # Secondary fallback face for Latin glyphs if primary is Sinhala
+                    face_fallback = None
+                    hb_font_fallback = None
+                    if has_sinhala and os.path.exists(noto_latin_path):
+                        face_fallback = freetype.Face(noto_latin_path)
+                        face_fallback.set_char_size(font_size * 64)
+                        with open(noto_latin_path, 'rb') as f_lat:
+                            hb_face_fallback = hb.Face(f_lat.read())
+                        hb_font_fallback = hb.Font(hb_face_fallback)
+                        hb_font_fallback.scale = (font_size * 64, font_size * 64)
 
                     buf = hb.Buffer()
                     buf.add_str(text_to_draw)
                     buf.guess_segment_properties()
-                    hb.shape(hb_font, buf)
+                    hb.shape(hb_font_si, buf)
 
                     cur_x, cur_y = xy
-                    # Baseline offset adjustment for FreeType
                     cur_y += int(font_size * 0.85)
 
                     for g_info, pos_info in zip(buf.glyph_infos, buf.glyph_positions):
-                        face.load_glyph(g_info.codepoint, freetype.FT_LOAD_RENDER)
-                        glyph_slot = face.glyph
+                        active_face = face_si
+                        glyph_id = g_info.codepoint
+
+                        # If primary font doesn't contain the glyph and fallback exists (e.g. Latin letters in Sinhala string)
+                        if glyph_id == 0 and face_fallback:
+                            # Re-shape single cluster in fallback font
+                            active_face = face_fallback
+                            glyph_id = active_face.get_char_index(ord(text_to_draw[g_info.cluster]) if g_info.cluster < len(text_to_draw) else 32)
+
+                        active_face.load_glyph(glyph_id, freetype.FT_LOAD_RENDER)
+                        glyph_slot = active_face.glyph
                         b_map = glyph_slot.bitmap
 
                         gx = int(cur_x + (pos_info.x_offset / 64.0) + glyph_slot.bitmap_left)
