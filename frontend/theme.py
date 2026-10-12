@@ -530,8 +530,151 @@ hr {
   font-size: 0.8rem;
 }
 
-.am-footer b {
-  color: var(--text-muted);
+/* Futuristic Ray Scan Preloader Overlay */
+#admitra-ray-loader {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: #ffffff;
+  z-index: 9999999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  animation: amLoaderFadeOut 0.8s cubic-bezier(0.16, 1, 0.3, 1) 2.2s forwards;
+}
+
+@keyframes amLoaderFadeOut {
+  0% {
+    opacity: 1;
+    visibility: visible;
+  }
+  100% {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+
+.am-scan-container {
+  position: relative;
+  width: 140px;
+  height: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 28px;
+  background: #ffffff;
+  padding: 8px;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.08), 0 0 0 1px rgba(226, 232, 240, 0.8);
+  overflow: hidden;
+}
+
+.am-scan-logo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 20px;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.08));
+  animation: amLogoPulse 2.2s ease-in-out infinite;
+}
+
+@keyframes amLogoPulse {
+  0%, 100% {
+    transform: scale(0.97);
+  }
+  50% {
+    transform: scale(1.03);
+  }
+}
+
+/* Luminous Horizontal Ray Scanner */
+.am-scan-ray {
+  position: absolute;
+  left: -20%;
+  width: 140%;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, #00f2fe, #4facfe, #00f2fe, transparent);
+  box-shadow: 0 0 16px 4px rgba(0, 242, 254, 0.8), 0 0 32px 8px rgba(79, 172, 254, 0.5);
+  animation: amRaySweep 1.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  z-index: 10;
+}
+
+@keyframes amRaySweep {
+  0% {
+    top: -5%;
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    top: 105%;
+    opacity: 0;
+  }
+}
+
+/* Outer Orbit Holographic Grid */
+.am-scan-grid {
+  position: absolute;
+  inset: 0;
+  border-radius: 28px;
+  background: linear-gradient(180deg, rgba(2, 132, 199, 0.06) 0%, transparent 100%);
+  pointer-events: none;
+}
+
+.am-loader-text {
+  margin-top: 24px;
+  font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #0f172a;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.am-loader-sub {
+  margin-top: 6px;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.am-loader-progress {
+  margin-top: 16px;
+  width: 180px;
+  height: 3px;
+  background: #f1f5f9;
+  border-radius: 999px;
+  overflow: hidden;
+  position: relative;
+}
+
+.am-loader-progress-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #0284c7, #00f2fe);
+  border-radius: 999px;
+  animation: amProgressFill 2.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes amProgressFill {
+  0% { width: 0%; }
+  35% { width: 45%; }
+  75% { width: 85%; }
+  100% { width: 100%; }
 }
 </style>
 """
@@ -539,6 +682,40 @@ hr {
 
 def inject_theme() -> None:
     st.markdown(_CSS, unsafe_allow_html=True)
+
+
+def render_initial_loader() -> None:
+    """
+    Renders an Apple-grade futuristic startup loading screen with 
+    the brand logo, radiant cyan laser ray scan sweep, and progress indicator.
+    """
+    # Only render on fresh session or page load
+    logo_b64 = get_logo_base64()
+    if logo_b64:
+        img_tag = f'<img src="data:image/jpeg;base64,{logo_b64}" class="am-scan-logo" alt="AdMitra" />'
+    else:
+        img_tag = '<div style="font-size:3.5rem; display:flex; align-items:center; justify-content:center; width:100%; height:100%;">⚡</div>'
+
+    st.markdown(
+        f"""
+        <div id="admitra-ray-loader">
+          <div class="am-scan-container">
+            <div class="am-scan-grid"></div>
+            {img_tag}
+            <div class="am-scan-ray"></div>
+          </div>
+          <div class="am-loader-text">
+            <span>AdMitra</span>
+            <span style="font-size:0.68rem; background:#0f172a; color:#ffffff; padding:2px 6px; border-radius:5px; font-weight:700;">AI</span>
+          </div>
+          <div class="am-loader-sub">Initializing Neural Marketing Engine...</div>
+          <div class="am-loader-progress">
+            <div class="am-loader-progress-bar"></div>
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def brand() -> None:

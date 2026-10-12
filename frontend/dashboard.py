@@ -80,10 +80,10 @@ except ImportError:
         return 0, "Vector store sync unavailable."
 
 try:
-    from frontend.theme import NAV_ITEMS, brand, briefing_card, inject_theme, kpi_card, kpi_row, page_header, render_apple_nav_header, render_footer
+    from frontend.theme import NAV_ITEMS, brand, briefing_card, inject_theme, kpi_card, kpi_row, page_header, render_apple_nav_header, render_footer, render_initial_loader
     from frontend.overview import render_overview
 except ImportError:  # when run with frontend/ as cwd
-    from theme import NAV_ITEMS, brand, briefing_card, inject_theme, kpi_card, kpi_row, page_header, render_apple_nav_header, render_footer  # type: ignore
+    from theme import NAV_ITEMS, brand, briefing_card, inject_theme, kpi_card, kpi_row, page_header, render_apple_nav_header, render_footer, render_initial_loader  # type: ignore
     from overview import render_overview  # type: ignore
 
 
@@ -2203,6 +2203,7 @@ def main() -> None:
 
     _inject_custom_css()
     inject_theme()
+    render_initial_loader()
 
     # Default parameters or session state cache (No Left Sidebar!)
     product = st.session_state.get("last_product", "Smart Noise-Canceling Headphones")
