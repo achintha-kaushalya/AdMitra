@@ -538,24 +538,42 @@ hr {
   width: 100vw;
   height: 100vh;
   background: #ffffff;
-  z-index: 9999999;
+  z-index: 99999999;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   pointer-events: none;
-  animation: amLoaderFadeOut 0.8s cubic-bezier(0.16, 1, 0.3, 1) 2.2s forwards;
+  transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.6s;
 }
 
-@keyframes amLoaderFadeOut {
-  0% {
-    opacity: 1;
-    visibility: visible;
-  }
-  100% {
-    opacity: 0;
-    visibility: hidden;
-  }
+#admitra-ray-loader.loaded {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* Also replace Streamlit's blank screen / skeleton loading with branded ray animation */
+[data-testid="stSkeleton"], .stSkeleton {
+  background: #ffffff !important;
+  position: relative !important;
+  overflow: hidden !important;
+}
+
+[data-testid="stSkeleton"]::after, .stSkeleton::after {
+  content: "" !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: -100% !important;
+  width: 200% !important;
+  height: 100% !important;
+  background: linear-gradient(90deg, transparent, rgba(0, 242, 254, 0.15), rgba(79, 172, 254, 0.25), transparent) !important;
+  animation: amRaySweepSkeleton 1.6s infinite !important;
+}
+
+@keyframes amRaySweepSkeleton {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
 }
 
 .am-scan-container {
@@ -708,11 +726,44 @@ def render_initial_loader() -> None:
             <span>AdMitra</span>
             <span style="font-size:0.68rem; background:#0f172a; color:#ffffff; padding:2px 6px; border-radius:5px; font-weight:700;">AI</span>
           </div>
-          <div class="am-loader-sub">Initializing Neural Marketing Engine...</div>
+          <div class="am-loader-sub">Loading Autonomous Marketing Command Center...</div>
           <div class="am-loader-progress">
             <div class="am-loader-progress-bar"></div>
           </div>
         </div>
+        <script>
+        (function() {{
+            function dismissLoader() {{
+                const loader = document.getElementById('admitra-ray-loader');
+                if (loader) {{
+                    loader.classList.add('loaded');
+                    setTimeout(() => {{
+                        if (loader && loader.parentNode) {{
+                            loader.parentNode.removeChild(loader);
+                        }}
+                    }}, 650);
+                }}
+            }}
+
+            // Ensure the logo and ray scanner stay clearly visible until main content appears
+            function checkReady() {{
+                const mainApp = document.querySelector('.am-apple-glass-header') || document.querySelector('.main');
+                if (mainApp) {{
+                    // Page DOM has rendered its core components!
+                    setTimeout(dismissLoader, 800);
+                }} else {{
+                    setTimeout(checkReady, 100);
+                }}
+            }}
+
+            if (document.readyState === 'complete') {{
+                checkReady();
+            }} else {{
+                window.addEventListener('load', checkReady);
+                setTimeout(checkReady, 500);
+            }}
+        }})();
+        </script>
         """,
         unsafe_allow_html=True,
     )
