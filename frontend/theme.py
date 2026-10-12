@@ -464,23 +464,43 @@ div[data-testid="stRadio"] div[role="radiogroup"][aria-orientation="horizontal"]
   transform: translateY(-1px);
 }
 
-/* Header Trigger Button Specific Styling */
+/* Header Trigger Button Specific Styling (Black Background with Red Text) */
 button[data-testid="baseButton-secondary"]:has(span:contains("Linked Accounts")),
-div:has(> button[data-testid*="btn_trigger_oauth_modal"]) > button {
-  height: 48px !important;
-  margin-top: 10px !important;
+div[data-testid="column"]:has(button[data-testid*="btn_trigger_oauth_modal"]) > div,
+div:has(> button[data-testid*="btn_trigger_oauth_modal"]) > button,
+button:has(p:contains("Linked Accounts")) {
+  height: 52px !important;
+  margin-top: 0px !important;
+  margin-bottom: 0px !important;
   background: #0f172a !important;
-  color: #ffffff !important;
-  border: 1px solid #0f172a !important;
-  font-weight: 700 !important;
-  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.12) !important;
+  background-color: #000000 !important;
+  color: #ff334b !important;
+  border: 1.5px solid #1e293b !important;
+  font-weight: 800 !important;
+  font-size: 0.88rem !important;
+  border-radius: 16px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12), 0 0 12px rgba(255, 51, 75, 0.15) !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
 }
 
-div:has(> button[data-testid*="btn_trigger_oauth_modal"]) > button:hover {
-  background: #1e293b !important;
-  border-color: #1e293b !important;
-  color: #ffffff !important;
-  transform: translateY(-1px);
+div:has(> button[data-testid*="btn_trigger_oauth_modal"]) > button p,
+button:has(p:contains("Linked Accounts")) p,
+button[data-testid="baseButton-secondary"]:has(span:contains("Linked Accounts")) span {
+  color: #ff334b !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.01em !important;
+}
+
+div:has(> button[data-testid*="btn_trigger_oauth_modal"]) > button:hover,
+button:has(p:contains("Linked Accounts")):hover {
+  background: #000000 !important;
+  border-color: #ff334b !important;
+  color: #ff4d63 !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2), 0 0 16px rgba(255, 51, 75, 0.3) !important;
 }
 
 /* Inputs & Selectboxes */
@@ -961,11 +981,11 @@ def render_apple_nav_header(current_page: str, used_mock: bool, meta_live: bool,
                 st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
 
     # Sleek Single-Line Apple Frosted Header
-    header_cols = st.columns([7.6, 2.4])
+    header_cols = st.columns([7.7, 2.3], vertical_alignment="center")
     with header_cols[0]:
         st.markdown(
             f"""
-            <div class="am-apple-glass-header" style="margin-bottom: 16px; padding: 10px 22px;">
+            <div class="am-apple-glass-header" style="margin-bottom: 0px; padding: 10px 22px;">
               <div class="am-top-left" style="gap: 12px;">
                 {logo_html}
                 <div>
@@ -990,6 +1010,8 @@ def render_apple_nav_header(current_page: str, used_mock: bool, meta_live: bool,
         if st.button(f"🔗 Linked Accounts ({connected_count}/4)", key="btn_trigger_oauth_modal", use_container_width=True):
             st.session_state["selected_oauth_channel"] = None
             show_connect_channels_dialog()
+
+    st.markdown("<div style='height: 14px;'></div>", unsafe_allow_html=True)
 
     # Sleek Tab Selector with generous whitespace (Linear style tabs)
     tab_names = [f"{icon} {label}" for _, icon, label in NAV_ITEMS]
