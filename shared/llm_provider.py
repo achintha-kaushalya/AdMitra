@@ -161,14 +161,16 @@ def compose_commercial_ad_poster(
     headline_english: str = "Special Offer",
     badge_text: str = "20% OFF",
     cta_text: str = "දැන්ම ඇනවුම් කරන්න / Shop Now",
-    brand_name: str = "Lanka Ads"
+    brand_name: str = "Lanka Ads",
+    target_lang: str = "bilingual"
 ) -> bytes:
     """
-    Composites a top-tier 10/10 commercial social media ad poster:
-    - Frosted glassmorphism top header & brand emblem
-    - High-visibility promotional badge (e.g. RS. 10,000 OFF)
-    - High-contrast lower gradient with multi-line Sinhala headline & English highlight
-    - High-CTR bottom contact ribbon
+    Applies Meta-optimized commercial overlay template:
+    - High-contrast top gradient with Brand Tag & Promo Badge
+    - Lower gradient with user-selected Language Typography:
+        * 'english'  : English Headline (Gold) + Subtitle/Offer + 'ORDER NOW' CTA
+        * 'sinhala'  : Sinhala Headline (Gold) + Sinhala CTA
+        * 'bilingual': Both Sinhala & English
     """
     from PIL import Image, ImageDraw, ImageFont
     import io
@@ -187,24 +189,13 @@ def compose_commercial_ad_poster(
             alpha = int(230 * (1.0 - (y / 220.0)))
             draw.line([(0, y), (1024, y)], fill=(10, 15, 30, alpha))
 
-        # 2. Bottom dark gradient for Sinhala & English copy
+        # 2. Bottom dark gradient for copy
         for y in range(650, 1024):
             alpha = int(250 * ((y - 650) / 374.0))
             draw.line([(0, y), (1024, y)], fill=(10, 15, 30, alpha))
 
-        # Fonts setup (Support Mac OS, Windows, and Linux)
-        import os
-        font_paths = [
-            "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
-            "/Library/Fonts/Arial Bold.ttf",
-            "/System/Library/Fonts/Helvetica.ttc",
-            "/System/Library/Fonts/Supplemental/Sinhala Sangam MN.ttc",
-            "/Library/Fonts/Sinhala Sangam MN.ttc",
-            "C:/Windows/Fonts/Nirmala.ttc",
-            "C:/Windows/Fonts/arialbd.ttf"
-        ]
-        
         def _get_font(size: int, is_bold: bool = False, prefer_sinhala: bool = False):
+            import os
             if prefer_sinhala:
                 for p in ["/System/Library/Fonts/Supplemental/Sinhala Sangam MN.ttc", "/Library/Fonts/Sinhala Sangam MN.ttc", "C:/Windows/Fonts/Nirmala.ttc", "/System/Library/Fonts/Helvetica.ttc"]:
                     if os.path.exists(p):
@@ -217,7 +208,8 @@ def compose_commercial_ad_poster(
             return ImageFont.load_default()
 
         sin_font = _get_font(40, is_bold=True, prefer_sinhala=True)
-        eng_font = _get_font(36, is_bold=True)
+        eng_font = _get_font(38, is_bold=True)
+        eng_sub_font = _get_font(28, is_bold=False)
         badge_font = _get_font(32, is_bold=True)
         brand_font = _get_font(28, is_bold=True)
         cta_font = _get_font(28, is_bold=True, prefer_sinhala=True)
@@ -228,36 +220,49 @@ def compose_commercial_ad_poster(
         clean_eng_head = headline_english.replace("✨", "").replace("🔥", "").replace("👉", "").strip()
         clean_badge = badge_text.replace("🔥", "").replace("✨", "").strip()
         clean_cta = cta_text.replace("👉", "").replace("✨", "").strip()
-        clean_brand = brand_name.strip() or "Lanka Ads"
+        clean_brand = brand_name.strip() or "AdMitra"
 
         # Top Right Discount / Promo Badge (Red pill badge with border)
         badge_w, badge_h = 280, 62
         bx0, by0 = 1024 - badge_w - 40, 40
         draw.rounded_rectangle([(bx0, by0), (bx0 + badge_w, by0 + badge_h)], radius=31, fill=(225, 29, 72, 250), outline=(255, 255, 255, 240), width=2)
-        # Decorative fire indicator dot
         draw.ellipse([(bx0 + 22, by0 + 22), (bx0 + 40, by0 + 40)], fill=(254, 240, 138, 255))
         draw.text((bx0 + 52, by0 + 13), clean_badge, fill=(255, 255, 255, 255), font=badge_font)
 
         # Top Left Brand Tag (Sleek dark glass pill)
         brand_w = max(240, len(clean_brand) * 18 + 60)
         draw.rounded_rectangle([(40, 40), (40 + brand_w, 102)], radius=14, fill=(15, 23, 42, 240), outline=(99, 102, 241, 230), width=2)
-        # Decorative brand icon circle
         draw.ellipse([(58, 58), (80, 80)], fill=(99, 102, 241, 255))
         draw.text((95, 54), clean_brand, fill=(255, 255, 255, 255), font=brand_font)
 
-        # Bottom Typography Banner: Sinhala + English
-        # Sinhala Headline (Prominent Gold/Yellow)
-        draw.text((50, 725), clean_sin_head[:55], fill=(254, 240, 138, 255), font=sin_font)
-        # English Sub-headline (Crisp White)
-        draw.text((50, 795), clean_eng_head[:60], fill=(248, 250, 252, 255), font=eng_font)
+        # Bottom Typography Banner based on target_lang
+        t_lang = (target_lang or "bilingual").lower()
+        if "eng" in t_lang:
+            # Pure English Ad Poster Layout
+            draw.text((50, 730), clean_eng_head[:55], fill=(254, 240, 138, 255), font=eng_font)
+            draw.text((50, 795), f"Exclusive Online Offer • Limited Time Deals", fill=(248, 250, 252, 255), font=eng_sub_font)
+            bottom_cta_text = clean_cta if any(c.isascii() for c in clean_cta) else "Order Online Today • Fast Islandwide Delivery"
+            button_label = "SHOP NOW"
+        elif "sin" in t_lang:
+            # Pure Sinhala Ad Poster Layout
+            draw.text((50, 730), clean_sin_head[:55], fill=(254, 240, 138, 255), font=sin_font)
+            draw.text((50, 795), "දිවයින පුරා බෙදාහැරීම • විශේෂ මිල අඩු කිරීම්", fill=(248, 250, 252, 255), font=sin_font)
+            bottom_cta_text = clean_cta
+            button_label = "ඇණවුම් කරන්න"
+        else:
+            # Bilingual Layout (Both)
+            draw.text((50, 725), clean_sin_head[:55], fill=(254, 240, 138, 255), font=sin_font)
+            draw.text((50, 795), clean_eng_head[:60], fill=(248, 250, 252, 255), font=eng_font)
+            bottom_cta_text = clean_cta
+            button_label = "ORDER NOW"
 
         # Bottom Action Bar / CTA Ribbon
         draw.rounded_rectangle([(50, 880), (974, 965)], radius=18, fill=(79, 70, 229, 250), outline=(199, 210, 254, 230), width=2)
-        draw.text((75, 905), clean_cta[:45], fill=(255, 255, 255, 255), font=cta_font)
+        draw.text((75, 905), bottom_cta_text[:45], fill=(255, 255, 255, 255), font=cta_font)
         
         # Inner CTA Button (Shop Now)
-        draw.rounded_rectangle([(730, 892), (955, 952)], radius=12, fill=(255, 255, 255, 255))
-        draw.text((758, 907), "ORDER NOW", fill=(67, 56, 202, 255), font=cta_btn_font)
+        draw.rounded_rectangle([(710, 892), (955, 952)], radius=12, fill=(255, 255, 255, 255))
+        draw.text((735, 907), button_label, fill=(67, 56, 202, 255), font=cta_btn_font)
 
         # Merge layers
         final_img = Image.alpha_composite(img, overlay).convert("RGB")
@@ -277,7 +282,8 @@ def generate_ad_image(
     badge_text: str = "20% OFF",
     cta_text: str = "දැන්ම ඇනවුම් කරන්න / Shop Now",
     brand_name: str = "Lanka Ads",
-    apply_ad_compositing: bool = True
+    apply_ad_compositing: bool = True,
+    target_lang: str = "bilingual"
 ) -> tuple[Optional[str], Optional[bytes]]:
     """
     Generates high-resolution commercial ad imagery with professional marketing overlays:
@@ -430,7 +436,8 @@ def generate_ad_image(
             headline_english=headline_english,
             badge_text=badge_text,
             cta_text=cta_text,
-            brand_name=brand_name
+            brand_name=brand_name,
+            target_lang=target_lang
         )
         return final_url, composed_bytes
     elif raw_bytes:

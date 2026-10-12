@@ -1538,26 +1538,37 @@ def _render_content_tab(data: dict[str, Any]) -> None:
             with st.expander("🛠️ Poster Branding & Typography Settings", expanded=False):
                 p_c1, p_c2 = st.columns(2)
                 with p_c1:
-                    custom_shop = st.text_input("Brand / Shop Name", value=st.session_state.get("custom_shop_name", "Lanka Ads"), key="in_shop_name")
+                    custom_shop = st.text_input("Brand / Shop Name", value=st.session_state.get("custom_shop_name", "AdMitra"), key="in_shop_name")
                     st.session_state["custom_shop_name"] = custom_shop
-                    custom_badge = st.text_input("Top Right Promo Badge", value=st.session_state.get("last_offer", "RS. 10,000 OFF"), key="in_badge_text")
+                    custom_badge = st.text_input("Top Right Promo Badge", value=st.session_state.get("last_offer", "20% OFF"), key="in_badge_text")
                 with p_c2:
-                    custom_contact = st.text_input("Bottom CTA Text / WhatsApp", value=st.session_state.get("custom_contact", "WhatsApp: 078 183 3131 | Lanka Ads"), key="in_contact_text")
+                    custom_contact = st.text_input("Bottom CTA Text / WhatsApp", value=st.session_state.get("custom_contact", "WhatsApp: 078 183 3131 | AdMitra"), key="in_contact_text")
                     st.session_state["custom_contact"] = custom_contact
 
-            # Allow toggling commercial poster overlay
-            overlay_toggle = st.checkbox("🎨 Apply Commercial Sinhala & English Ad Overlay (Badges + Typography)", value=True, key="chk_ad_overlay")
+            # Ad Template Target Language Selector
+            st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
+            col_lang_sel, col_ovr = st.columns([1.3, 1])
+            with col_lang_sel:
+                ad_poster_lang = st.radio(
+                    "🌐 Select Ad Poster Language Template",
+                    ["🇬🇧 English Poster", "🇱🇰 Sinhala Poster", "✨ Bilingual (Both)"],
+                    horizontal=True,
+                    key="ad_poster_lang_choice"
+                )
+            with col_ovr:
+                overlay_toggle = st.checkbox("🎨 Apply Commercial Typography & Badges Overlay", value=True, key="chk_ad_overlay")
+
+            target_lang_code = "english" if "English" in ad_poster_lang else ("sinhala" if "Sinhala" in ad_poster_lang else "bilingual")
 
             if st.button("🪄 Generate 8K Ad Poster", type="primary", use_container_width=True):
-                with st.spinner("Rendering 8K commercial ad creative & applying Sinhala typography overlays..."):
+                with st.spinner(f"Rendering 8K commercial ad creative ({target_lang_code.upper()} typography template)..."):
                     try:
-                        sin_head_val = st.session_state.get("edit_sin_head") or sinhala.get("headline", "iPhone 17 Pro Max සඳහා රු. 10,000 ක විශේෂ වට්ටමක්!")
-                        eng_head_val = st.session_state.get("edit_eng_head") or english.get("headline", "Flat Rs. 10,000 OFF • Lanka Ads")
-                        offer_val = st.session_state.get("in_badge_text") or st.session_state.get("last_offer", "RS. 10,000 OFF")
-                        shop_val = st.session_state.get("in_shop_name", "Lanka Ads")
-                        contact_val = st.session_state.get("in_contact_text", "WhatsApp: 078 183 3131 | Lanka Ads")
+                        sin_head_val = st.session_state.get("edit_sin_head") or sinhala.get("headline", "විශේෂ දීමනාවක් අදම ලබාගන්න!")
+                        eng_head_val = st.session_state.get("edit_eng_head") or english.get("headline", "Special Limited Time Offer!")
+                        offer_val = st.session_state.get("in_badge_text") or st.session_state.get("last_offer", "20% OFF")
+                        shop_val = st.session_state.get("in_shop_name", "AdMitra")
+                        contact_val = st.session_state.get("in_contact_text", "WhatsApp: 078 183 3131 | AdMitra")
                         
-                        # Use active prompt from text area or product name directly
                         prompt_to_use = (st.session_state.get("t2i_prompt_input") or t2i_prompt or curr_prod).strip()
                         
                         img_url, img_bytes = generate_ad_image(
@@ -1567,12 +1578,14 @@ def _render_content_tab(data: dict[str, Any]) -> None:
                             badge_text=offer_val,
                             cta_text=contact_val,
                             brand_name=shop_val,
-                            apply_ad_compositing=overlay_toggle
+                            apply_ad_compositing=overlay_toggle,
+                            target_lang=target_lang_code
                         )
                         st.session_state["creative_image_url"] = img_url
                         st.session_state["creative_image_bytes"] = img_bytes
+                        st.session_state["active_ad_poster_lang"] = target_lang_code
                         if img_bytes or img_url:
-                            st.session_state["last_vis_status"] = f"✅ High-Converting Ad Poster Generated! ({len(img_bytes) if img_bytes else 'URL'} bytes)"
+                            st.session_state["last_vis_status"] = f"✅ High-Converting {target_lang_code.title()} Ad Poster Generated!"
                             st.session_state["last_vis_error"] = None
                         else:
                             st.session_state["last_vis_status"] = None
@@ -1593,6 +1606,11 @@ def _render_content_tab(data: dict[str, Any]) -> None:
                 height=75,
                 key="img2img_prompt"
             )
+            col_mp_l, _ = st.columns([1.5, 1])
+            with col_mp_l:
+                mp_lang = st.radio("Ad Template Language", ["🇬🇧 English", "🇱🇰 Sinhala", "✨ Bilingual"], horizontal=True, key="mp_lang_choice")
+                mp_lang_code = "english" if "English" in mp_lang else ("sinhala" if "Sinhala" in mp_lang else "bilingual")
+            
             if st.button("✨ Transform on Virtual Model", type="primary", use_container_width=True):
                 with st.spinner("Synthesizing virtual studio model photoshoot..."):
                     try:
@@ -1605,12 +1623,14 @@ def _render_content_tab(data: dict[str, Any]) -> None:
                             img_bytes = compose_commercial_ad_poster(
                                 img_bytes,
                                 headline_sinhala=sinhala.get("headline", "විලාසිතා එකතුව"),
-                                headline_english=english.get("headline", "Fashion Collection"),
+                                headline_english=english.get("headline", "Exclusive Fashion Collection"),
                                 badge_text="NEW ARRIVAL",
-                                cta_text="දැන්ම ඇනවුම් කරන්න / Shop Now"
+                                cta_text="දැන්ම ඇනවුම් කරන්න / Shop Now",
+                                target_lang=mp_lang_code
                             )
                         st.session_state["creative_image_url"] = img_url
                         st.session_state["creative_image_bytes"] = img_bytes
+                        st.session_state["active_ad_poster_lang"] = mp_lang_code
                         st.session_state["last_vis_status"] = f"👗 Placement rendered! Prompt: {refined_p}"
                         st.session_state["last_vis_error"] = None
                         st.rerun()
@@ -1667,12 +1687,15 @@ def _render_content_tab(data: dict[str, Any]) -> None:
             """
             <div class="glass-card" style="padding: 16px 18px; border-left: 4px solid #10b981;">
                 <h4 style="margin-top:0; color:#34d399; font-size: 1.05rem;">📝 2. Bilingual Copy Studios & Angles</h4>
+                <div style="font-size:0.80rem; color:#64748b; margin-top: 2px;">
+                    Review angles and see realistic Facebook Ad post mockups for both English and Sinhala.
+                </div>
             </div>
             """,
             unsafe_allow_html=True
         )
 
-        tab_copy_en, tab_copy_si = st.tabs(["🇬🇧 English Copy", "🇱🇰 Sinhala Copy (සිංහල)"])
+        tab_copy_en, tab_copy_si = st.tabs(["🇬🇧 English Facebook Post", "🇱🇰 Sinhala Facebook Post (සිංහල)"])
 
         with tab_copy_en:
             angle_options_en = [f"Angle {i+1}: {a.get('angle', 'Value Proposition')}" for i, a in enumerate(eng_angles)] if eng_angles else ["Default Creative"]
@@ -1693,6 +1716,7 @@ def _render_content_tab(data: dict[str, Any]) -> None:
             st.progress(min(len(active_eng_head) / 40.0, 1.0))
             st.progress(min(len(active_eng_body) / 125.0, 1.0))
 
+            # Render Full English Live Facebook Ad Mockup
             st.markdown(
                 f"""
                 <div class="ad-preview-box">
@@ -1704,6 +1728,24 @@ def _render_content_tab(data: dict[str, Any]) -> None:
                         </div>
                     </div>
                     <div class="ad-body" style="white-space: pre-wrap;">{active_eng_body}</div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+            # Show Ad Photo directly attached inside the Facebook feed post
+            if cur_bytes:
+                _show_image(cur_bytes, caption="Post Creative (English Template Applied)")
+            elif cur_url:
+                _show_image(cur_url, caption="Post Creative (English Template Applied)")
+
+            st.markdown(
+                f"""
+                <div class="ad-preview-box" style="margin-top:-6px; border-top:none; border-top-left-radius:0; border-top-right-radius:0;">
+                    <div class="ad-headline-bar">
+                        <div class="ad-headline-text">{active_eng_head}</div>
+                        <div class="ad-cta-btn">{eng_cta}</div>
+                    </div>
                 </div>
                 """,
                 unsafe_allow_html=True
@@ -1728,6 +1770,7 @@ def _render_content_tab(data: dict[str, Any]) -> None:
             st.progress(min(len(active_sin_head) / 40.0, 1.0))
             st.progress(min(len(active_sin_body) / 125.0, 1.0))
 
+            # Render Full Sinhala Live Facebook Ad Mockup
             st.markdown(
                 f"""
                 <div class="ad-preview-box">
@@ -1738,9 +1781,25 @@ def _render_content_tab(data: dict[str, Any]) -> None:
                             <div class="ad-sponsored">අනුග්‍රහය දක්වන ලදී • 🌐</div>
                         </div>
                     </div>
-                <div class="ad-headline-bar" style="margin-top: 6px;">
-                    <div class="ad-headline-text">{active_sin_head}</div>
-                    <div class="ad-cta-btn">{sin_cta}</div>
+                    <div class="ad-body" style="white-space: pre-wrap;">{active_sin_body}</div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+            # Show Ad Photo directly attached inside the Facebook feed post
+            if cur_bytes:
+                _show_image(cur_bytes, caption="පළකිරීමේ නිර්මාණය (සිංහල දැන්වීම් ආකෘතිය)")
+            elif cur_url:
+                _show_image(cur_url, caption="පළකිරීමේ නිර්මාණය (සිංහල දැන්වීම් ආකෘතිය)")
+
+            st.markdown(
+                f"""
+                <div class="ad-preview-box" style="margin-top:-6px; border-top:none; border-top-left-radius:0; border-top-right-radius:0;">
+                    <div class="ad-headline-bar">
+                        <div class="ad-headline-text">{active_sin_head}</div>
+                        <div class="ad-cta-btn">{sin_cta}</div>
+                    </div>
                 </div>
                 """,
                 unsafe_allow_html=True
