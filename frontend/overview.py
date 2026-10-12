@@ -127,7 +127,9 @@ def render_overview(metrics: list, health_score: int, issues: list, sentiment: s
                 bordercolor="#e2e8f0",
             ),
         ))
-        gauge.update_layout(**_LAYOUT, height=270, margin=dict(l=15, r=15, t=20, b=10))
+        gauge_layout = dict(_LAYOUT)
+        gauge_layout.pop("margin", None)
+        gauge.update_layout(**gauge_layout, height=270, margin=dict(l=15, r=15, t=20, b=10))
         st.plotly_chart(gauge, use_container_width=True, config={"displayModeBar": False})
         st.caption(f"Audience sentiment: **{sentiment}**")
 
