@@ -544,13 +544,23 @@ hr {
   align-items: center;
   justify-content: center;
   pointer-events: none;
-  transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.6s;
+  animation: amLoaderAutoExit 0.6s cubic-bezier(0.16, 1, 0.3, 1) 1.6s forwards !important;
 }
 
-#admitra-ray-loader.loaded {
-  opacity: 0 !important;
-  visibility: hidden !important;
-  pointer-events: none !important;
+@keyframes amLoaderAutoExit {
+  0% {
+    opacity: 1;
+    visibility: visible;
+  }
+  99% {
+    opacity: 0;
+    visibility: visible;
+  }
+  100% {
+    opacity: 0;
+    visibility: hidden;
+    display: none;
+  }
 }
 
 /* Also replace Streamlit's blank screen / skeleton loading with branded ray animation */
@@ -731,39 +741,6 @@ def render_initial_loader() -> None:
             <div class="am-loader-progress-bar"></div>
           </div>
         </div>
-        <script>
-        (function() {{
-            function dismissLoader() {{
-                const loader = document.getElementById('admitra-ray-loader');
-                if (loader) {{
-                    loader.classList.add('loaded');
-                    setTimeout(() => {{
-                        if (loader && loader.parentNode) {{
-                            loader.parentNode.removeChild(loader);
-                        }}
-                    }}, 650);
-                }}
-            }}
-
-            // Ensure the logo and ray scanner stay clearly visible until main content appears
-            function checkReady() {{
-                const mainApp = document.querySelector('.am-apple-glass-header') || document.querySelector('.main');
-                if (mainApp) {{
-                    // Page DOM has rendered its core components!
-                    setTimeout(dismissLoader, 800);
-                }} else {{
-                    setTimeout(checkReady, 100);
-                }}
-            }}
-
-            if (document.readyState === 'complete') {{
-                checkReady();
-            }} else {{
-                window.addEventListener('load', checkReady);
-                setTimeout(checkReady, 500);
-            }}
-        }})();
-        </script>
         """,
         unsafe_allow_html=True,
     )
